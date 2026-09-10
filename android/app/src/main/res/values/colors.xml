@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="vinyl_black">#121214</color>
+    <color name="vinyl_surface">#1C1B1F</color>
+    <color name="vinyl_gold">#FFB74D</color>
+    <color name="vinyl_accent">#E65100</color>
+    <color name="white">#FFFFFF</color>
+</resources>

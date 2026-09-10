@@ -1,0 +1,1 @@
+# Vinyl Catalog Proguard rules

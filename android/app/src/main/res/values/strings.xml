@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vinyl Catalog</string>
+    <string name="nav_scanner">Scan</string>
+    <string name="nav_catalog">Collection</string>
+    <string name="nav_settings">Settings</string>
+</resources>
