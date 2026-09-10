@@ -39,9 +39,16 @@ class AlbumUpdate(BaseModel):
     release_year: Optional[int] = None
     label: Optional[str] = None
     catalog_number: Optional[str] = None
+    barcode: Optional[str] = None
+    format: Optional[str] = None
     country: Optional[str] = None
     pressing_status: Optional[str] = None
+    metadata_source: Optional[str] = None
+    musicbrainz_release_id: Optional[str] = None
     discogs_release_id: Optional[int] = None
+    discogs_master_id: Optional[int] = None
+    cover_image_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     media_condition: Optional[str] = None
     sleeve_condition: Optional[str] = None
     purchase_price: Optional[float] = None

@@ -132,6 +132,54 @@ async def get_album(album_id: int, conn: asyncpg.Connection = Depends(get_catalo
     album_dict["tracks"] = [TrackItem(**dict(tr)) for tr in track_rows]
     return AlbumResponse(**album_dict)
 
+@router.put("/albums/{album_id}", response_model=AlbumResponse)
+@router.patch("/albums/{album_id}", response_model=AlbumResponse)
+async def update_album(
+    album_id: int,
+    album_update: AlbumUpdate,
+    conn: asyncpg.Connection = Depends(get_catalog_conn)
+):
+    existing = await conn.fetchrow("SELECT * FROM albums WHERE id = $1;", album_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Album not found")
+
+    update_data = album_update.model_dump(exclude_unset=True)
+    fields = []
+    args = []
+    
+    for field_name, value in update_data.items():
+        if field_name == "musicbrainz_release_id" and value:
+            try:
+                value = uuid.UUID(str(value))
+            except ValueError:
+                value = None
+        args.append(value)
+        fields.append(f"{field_name} = ${len(args)}")
+    
+    if not fields:
+        return await get_album(album_id, conn)
+
+    fields.append("updated_at = CURRENT_TIMESTAMP")
+    args.append(album_id)
+    
+    query = f"""
+    UPDATE albums
+    SET {', '.join(fields)}
+    WHERE id = ${len(args)}
+    RETURNING *;
+    """
+    row = await conn.fetchrow(query, *args)
+    album_dict = dict(row)
+    if album_dict.get("musicbrainz_release_id"):
+        album_dict["musicbrainz_release_id"] = str(album_dict["musicbrainz_release_id"])
+        
+    track_rows = await conn.fetch(
+        "SELECT position, title, duration, is_favorite FROM tracks WHERE album_id = $1 ORDER BY id;",
+        album_id
+    )
+    album_dict["tracks"] = [TrackItem(**dict(tr)) for tr in track_rows]
+    return AlbumResponse(**album_dict)
+
 @router.delete("/albums/{album_id}")
 async def delete_album(album_id: int, conn: asyncpg.Connection = Depends(get_catalog_conn)):
     result = await conn.execute("DELETE FROM albums WHERE id = $1;", album_id)
