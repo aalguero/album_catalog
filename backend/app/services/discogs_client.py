@@ -8,6 +8,8 @@ DISCOGS_BASE_URL = "https://api.discogs.com"
 async def search_discogs_direct(
     barcode: Optional[str] = None,
     catno: Optional[str] = None,
+    artist: Optional[str] = None,
+    title: Optional[str] = None,
     query: Optional[str] = None
 ) -> List[MatchCandidate]:
     headers = {
@@ -26,8 +28,19 @@ async def search_discogs_direct(
             params["q"] = cleaned
         else:
             params["barcode"] = cleaned
+    elif catno and (artist or title):
+        params["catno"] = catno.strip()
+        if artist:
+            params["artist"] = artist.strip()
+        if title:
+            params["release_title"] = title.strip()
     elif catno:
         params["catno"] = catno.strip()
+    elif artist or title:
+        if artist:
+            params["artist"] = artist.strip()
+        if title:
+            params["release_title"] = title.strip()
     elif query:
         params["q"] = query.strip()
     else:

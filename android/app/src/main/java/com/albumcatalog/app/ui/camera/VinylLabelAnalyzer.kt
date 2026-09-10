@@ -23,9 +23,12 @@ class VinylLabelAnalyzer(
         RegexOption.IGNORE_CASE
     )
 
+    @Volatile
+    private var isTriggered = false
+
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        if (!isScanningEnabled()) {
+        if (!isScanningEnabled() || isTriggered) {
             imageProxy.close()
             return
         }
@@ -35,7 +38,7 @@ class VinylLabelAnalyzer(
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
             recognizer.process(image)
                 .addOnSuccessListener { visionText ->
-                    if (!isScanningEnabled()) return@addOnSuccessListener
+                    if (!isScanningEnabled() || isTriggered) return@addOnSuccessListener
                     val fullText = visionText.text.trim()
                     if (fullText.length >= 3) {
                         val now = System.currentTimeMillis()
@@ -61,6 +64,7 @@ class VinylLabelAnalyzer(
                                 }
                             }
 
+                            isTriggered = true
                             onLabelDetected(fullText, catnoMatch)
                         }
                     }

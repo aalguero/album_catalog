@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.PlayArrow
@@ -73,6 +75,7 @@ fun ScannerScreen(
     val isTorchOn by viewModel.isTorchOn.collectAsState()
     val matchState by viewModel.matchState.collectAsState()
     val discogsState by viewModel.discogsState.collectAsState()
+    val ocrCorrectionState by viewModel.ocrCorrectionState.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -274,6 +277,20 @@ fun ScannerScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
+                        if (!noMatch.artist.isNullOrEmpty()) {
+                            Text(
+                                text = "Artist: ${noMatch.artist}",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                        if (!noMatch.title.isNullOrEmpty()) {
+                            Text(
+                                text = "Title: ${noMatch.title}",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
 
                     Text(
@@ -291,21 +308,29 @@ fun ScannerScreen(
                         Button(
                             onClick = { viewModel.resumeScanning() },
                             modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E2E36), contentColor = TextPrimary),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Scan Again", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                viewModel.openOcrCorrection(
+                                    catno = noMatch.detectedCatno,
+                                    artist = noMatch.artist,
+                                    title = noMatch.title,
+                                    rawText = noMatch.scannedValue,
+                                    scanType = noMatch.queryType
+                                )
+                            },
+                            modifier = Modifier.weight(1.3f),
                             colors = ButtonDefaults.buttonColors(containerColor = VinylGold, contentColor = Color.Black),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Scan Again", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                searchQuery = noMatch.detectedCatno ?: noMatch.scannedValue
-                                viewModel.resumeScanning()
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("Edit in Search", color = VinylGold, fontSize = 12.sp)
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Correct & Re-search", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }
@@ -315,6 +340,7 @@ fun ScannerScreen(
         // 6. Match Results Modal Bottom Sheet
         if (matchState is MatchUiState.MatchesFound) {
             val candidates = (matchState as MatchUiState.MatchesFound).candidates
+            val matchFound = matchState as MatchUiState.MatchesFound
             ModalBottomSheet(
                 onDismissRequest = { viewModel.resumeScanning() },
                 sheetState = bottomSheetState,
@@ -349,6 +375,26 @@ fun ScannerScreen(
                             viewModel.startDiscogsRefinement(candidate)
                         }
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.openOcrCorrection(
+                                catno = matchFound.detectedCatno,
+                                rawText = matchFound.rawScannedValue,
+                                scanType = if (scanMode == ScanMode.BARCODE) "Barcode" else "Vinyl Center Label OCR"
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF81D4FA)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0288D1))
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("None of these match? Correct OCR & Re-search", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
@@ -382,6 +428,31 @@ fun ScannerScreen(
                         }
                     },
                     onDismiss = { viewModel.dismissDiscogsSheet() }
+                )
+            }
+        }
+
+        // 8. Dedicated OCR Error Correction Sheet
+        if (ocrCorrectionState.isVisible) {
+            ModalBottomSheet(
+                onDismissRequest = { viewModel.dismissOcrCorrection() },
+                containerColor = VinylBlack
+            ) {
+                OcrCorrectionSheet(
+                    initialCatno = ocrCorrectionState.catno,
+                    initialArtist = ocrCorrectionState.artist,
+                    initialTitle = ocrCorrectionState.title,
+                    initialRawText = ocrCorrectionState.rawText,
+                    scanType = ocrCorrectionState.scanType,
+                    onReSearch = { catno, artist, title, rawText ->
+                        viewModel.performCorrectedSearch(catno, artist, title, rawText)
+                    },
+                    onCreateManual = { catno, artist, title, label, year ->
+                        val manualAlbum = viewModel.buildManualAlbum(catno, artist, title, label, year)
+                        viewModel.resetMatchState()
+                        onCandidateSelectedForConfirmation(manualAlbum)
+                    },
+                    onDismiss = { viewModel.dismissOcrCorrection() }
                 )
             }
         }

@@ -41,57 +41,72 @@ async def scan_metadata(
                 if candidates:
                     source_used = "discogs"
 
-    # 2. Catalog Number
-    elif req.catalog_number:
-        query_type = "catalog_number"
-        candidates = await search_by_catalog_number(conn, req.catalog_number)
-        if candidates:
-            source_used = "local_musicbrainz"
-        else:
-            candidates = await search_remote_musicbrainz(catalog_number=req.catalog_number)
-            if candidates:
-                source_used = "remote_musicbrainz"
-            else:
-                candidates = await search_discogs_direct(catno=req.catalog_number)
-                if candidates:
-                    source_used = "discogs"
-
-    # 3. Center label / text OCR
-    elif req.spine_text:
-        query_type = "label_text"
-        extracted_catno = extract_potential_catno(req.spine_text)
-        if extracted_catno:
-            candidates = await search_by_catalog_number(conn, extracted_catno)
+    # 2. Catalog Number and/or Artist/Title and/or OCR Text
+    else:
+        # Check if catalog number provided
+        if req.catalog_number:
+            query_type = "catalog_number"
+            candidates = await search_by_catalog_number(conn, req.catalog_number)
             if candidates:
                 source_used = "local_musicbrainz"
-        
-        # If no catno match or extra text, try remote or token search
-        if not candidates:
-            candidates = await search_remote_musicbrainz(
-                catalog_number=extracted_catno,
-                title=req.spine_text
-            )
-            if candidates:
-                source_used = "remote_musicbrainz"
             else:
-                candidates = await search_discogs_direct(query=req.spine_text)
+                candidates = await search_remote_musicbrainz(
+                    catalog_number=req.catalog_number,
+                    artist=req.artist,
+                    title=req.title
+                )
                 if candidates:
-                    source_used = "discogs"
+                    source_used = "remote_musicbrainz"
+                else:
+                    candidates = await search_discogs_direct(
+                        catno=req.catalog_number,
+                        artist=req.artist,
+                        title=req.title
+                    )
+                    if candidates:
+                        source_used = "discogs"
 
-    # 4. Explicit Artist + Title
-    elif req.artist and req.title:
-        query_type = "artist_title"
-        candidates = await search_by_artist_title(conn, req.artist, req.title)
-        if candidates:
-            source_used = "local_musicbrainz"
-        else:
-            candidates = await search_remote_musicbrainz(artist=req.artist, title=req.title)
-            if candidates:
-                source_used = "remote_musicbrainz"
-            else:
-                candidates = await search_discogs_direct(query=f"{req.artist} {req.title}")
+        # Fallback to Artist and/or Title if catalog number produced no results or was absent
+        if not candidates and (req.artist or req.title):
+            query_type = "artist_title"
+            if req.artist and req.title:
+                candidates = await search_by_artist_title(conn, req.artist, req.title)
                 if candidates:
-                    source_used = "discogs"
+                    source_used = "local_musicbrainz"
+
+            if not candidates:
+                candidates = await search_remote_musicbrainz(artist=req.artist, title=req.title)
+                if candidates:
+                    source_used = "remote_musicbrainz"
+                else:
+                    candidates = await search_discogs_direct(
+                        artist=req.artist,
+                        title=req.title,
+                        query=f"{req.artist or ''} {req.title or ''}".strip() or None
+                    )
+                    if candidates:
+                        source_used = "discogs"
+
+        # Fallback to Center label / text OCR if still no candidates
+        if not candidates and req.spine_text:
+            query_type = "label_text"
+            extracted_catno = extract_potential_catno(req.spine_text)
+            if extracted_catno:
+                candidates = await search_by_catalog_number(conn, extracted_catno)
+                if candidates:
+                    source_used = "local_musicbrainz"
+            
+            if not candidates:
+                candidates = await search_remote_musicbrainz(
+                    catalog_number=extracted_catno,
+                    title=req.spine_text
+                )
+                if candidates:
+                    source_used = "remote_musicbrainz"
+                else:
+                    candidates = await search_discogs_direct(query=req.spine_text)
+                    if candidates:
+                        source_used = "discogs"
 
     top3 = rank_and_select_top_candidates(
         candidates,

@@ -29,11 +29,13 @@ class BarcodeAnalyzer(
     private val scanner = BarcodeScanning.getClient(options)
     private var lastScannedCode: String? = null
     private var lastScannedTimestamp: Long = 0L
+    @Volatile
+    private var isTriggered = false
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        // Immediately drop frames if scanning is paused/disabled
-        if (!isScanningEnabled()) {
+        // Immediately drop frames if scanning is paused/disabled or already triggered
+        if (!isScanningEnabled() || isTriggered) {
             imageProxy.close()
             return
         }
@@ -43,7 +45,7 @@ class BarcodeAnalyzer(
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
             scanner.process(image)
                 .addOnSuccessListener { barcodes ->
-                    if (!isScanningEnabled()) return@addOnSuccessListener
+                    if (!isScanningEnabled() || isTriggered) return@addOnSuccessListener
                     for (barcode in barcodes) {
                         barcode.rawValue?.let { rawCode ->
                             val code = rawCode.trim()
@@ -52,7 +54,9 @@ class BarcodeAnalyzer(
                             if (code != lastScannedCode || now - lastScannedTimestamp > 2500L) {
                                 lastScannedCode = code
                                 lastScannedTimestamp = now
+                                isTriggered = true
                                 onBarcodeDetected(code)
+                                return@addOnSuccessListener
                             }
                         }
                     }

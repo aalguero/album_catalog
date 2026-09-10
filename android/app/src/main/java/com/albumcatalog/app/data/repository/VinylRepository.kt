@@ -33,6 +33,25 @@ class VinylRepository {
         }
     }
 
+    suspend fun searchWithCorrections(
+        catno: String? = null,
+        artist: String? = null,
+        title: String? = null,
+        fullText: String? = null
+    ): Result<ScanResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = api.scan(ScanRequest(
+                catalogNumber = catno?.trim()?.ifEmpty { null },
+                artist = artist?.trim()?.ifEmpty { null },
+                title = title?.trim()?.ifEmpty { null },
+                spineText = fullText?.trim()?.ifEmpty { null }
+            ))
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun updateAlbum(id: Int, album: Album): Result<Album> = withContext(Dispatchers.IO) {
         try {
             val updated = api.updateAlbum(id, album)

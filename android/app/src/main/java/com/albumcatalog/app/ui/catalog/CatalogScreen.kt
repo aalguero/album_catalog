@@ -118,7 +118,7 @@ fun CatalogScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.onSearchQueryChanged(it) },
-                placeholder = { Text("Filter collection by artist, title, or shelf...") },
+                placeholder = { Text("Filter collection by artist, title, or label...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = VinylGold) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -333,14 +333,15 @@ fun AlbumCatalogItem(
                     )
                 }
 
-                // Shelf Location
-                album.shelfLocation?.let {
+                // Price Paid Badge (replaces shelf/crate indicator)
+                album.purchasePrice?.let { price ->
                     Text(
-                        text = it,
-                        color = TextTertiary,
+                        text = "$%.2f".format(price),
+                        color = Color(0xFF81D4FA),
                         fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
                         modifier = Modifier
-                            .background(Color(0xFF33333E), RoundedCornerShape(4.dp))
+                            .background(Color(0xFF81D4FA).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
                             .padding(horizontal = 4.dp, vertical = 2.dp)
                     )
                 }
@@ -397,10 +398,9 @@ fun AlbumDetailContent(
             album.catalogNumber?.let { "Cat#: $it" },
             album.country?.let { "Country: $it" },
             album.barcode?.let { "Barcode: $it" },
-            album.shelfLocation?.let { "Shelf: $it" },
             album.mediaCondition?.let { "Media: $it" },
             album.sleeveCondition?.let { "Sleeve: $it" },
-            album.purchasePrice?.let { "Paid: $$it" }
+            album.purchasePrice?.let { "Paid: $${"%.2f".format(it)}" }
         )
         Text(details.joinToString(" • "), fontSize = 12.sp, color = TextSecondary)
 

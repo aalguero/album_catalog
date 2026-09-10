@@ -50,38 +50,21 @@ fun CameraPreviewView(
         camera?.cameraControl?.enableTorch(isTorchOn)
     }
 
-    LaunchedEffect(scanMode, isScanningActive) {
+    // High resolution (1080p) analysis for vinyl barcodes and label OCR
+    val imageAnalysis = remember {
+        ImageAnalysis.Builder()
+            .setTargetResolution(Size(1920, 1080))
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+    }
+
+    LaunchedEffect(lifecycleOwner) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
             val preview = Preview.Builder().build().also {
                 it.surfaceProvider = previewView.surfaceProvider
             }
-
-            // High resolution (1080p) analysis for high-density vinyl barcodes
-            val imageAnalysis = ImageAnalysis.Builder()
-                .setTargetResolution(Size(1920, 1080))
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-
-            if (scanMode == ScanMode.BARCODE) {
-                imageAnalysis.setAnalyzer(
-                    cameraExecutor,
-                    BarcodeAnalyzer(
-                        isScanningEnabled = { isScanningActive },
-                        onBarcodeDetected = onBarcodeDetected
-                    )
-                )
-            } else {
-                imageAnalysis.setAnalyzer(
-                    cameraExecutor,
-                    VinylLabelAnalyzer(
-                        isScanningEnabled = { isScanningActive },
-                        onLabelDetected = onLabelDetected
-                    )
-                )
-            }
-
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
@@ -109,6 +92,30 @@ fun CameraPreviewView(
                 e.printStackTrace()
             }
         }, ContextCompat.getMainExecutor(context))
+    }
+
+    LaunchedEffect(scanMode, isScanningActive) {
+        if (!isScanningActive) {
+            imageAnalysis.clearAnalyzer()
+        } else {
+            if (scanMode == ScanMode.BARCODE) {
+                imageAnalysis.setAnalyzer(
+                    cameraExecutor,
+                    BarcodeAnalyzer(
+                        isScanningEnabled = { isScanningActive },
+                        onBarcodeDetected = onBarcodeDetected
+                    )
+                )
+            } else {
+                imageAnalysis.setAnalyzer(
+                    cameraExecutor,
+                    VinylLabelAnalyzer(
+                        isScanningEnabled = { isScanningActive },
+                        onLabelDetected = onLabelDetected
+                    )
+                )
+            }
+        }
     }
 
     DisposableEffect(Unit) {
