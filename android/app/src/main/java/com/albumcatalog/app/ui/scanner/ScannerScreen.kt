@@ -1,6 +1,7 @@
 package com.albumcatalog.app.ui.scanner
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TrackChanges
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -43,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,6 +58,7 @@ import com.albumcatalog.app.ui.camera.ScanOverlay
 import com.albumcatalog.app.ui.components.Top3MatchCards
 import com.albumcatalog.app.ui.theme.TextPrimary
 import com.albumcatalog.app.ui.theme.TextSecondary
+import com.albumcatalog.app.ui.theme.TextTertiary
 import com.albumcatalog.app.ui.theme.VinylBlack
 import com.albumcatalog.app.ui.theme.VinylGold
 
@@ -204,22 +209,104 @@ fun ScannerScreen(
             }
         }
 
-        // 5. No Match Dialog / Banner
+        // 5. No Match Found Card with Exact Scanned Metadata
         if (matchState is MatchUiState.NoMatch) {
-            val reason = (matchState as MatchUiState.NoMatch).reason
+            val noMatch = matchState as MatchUiState.NoMatch
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 30.dp, start = 20.dp, end = 20.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.Black.copy(alpha = 0.9f))
+                    .padding(bottom = 30.dp, start = 16.dp, end = 16.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black.copy(alpha = 0.94f))
+                    .border(1.5.dp, Color(0xFFEF5350), RoundedCornerShape(16.dp))
                     .padding(16.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(reason, color = TextPrimary, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(onClick = { viewModel.resumeScanning() }) {
-                        Text("Scan Again", color = VinylGold)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "No Matching Release Found",
+                            color = Color(0xFFEF5350),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(onClick = { viewModel.resumeScanning() }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
+                        }
+                    }
+
+                    Text(
+                        text = "Scanned metadata used for search:",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    // Scanned values display card
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E1E24))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Scan Type: ${noMatch.queryType}",
+                            color = VinylGold,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Raw Scanned Value: \"${noMatch.scannedValue}\"",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        if (!noMatch.detectedCatno.isNullOrEmpty()) {
+                            Text(
+                                text = "Extracted Catalog #: ${noMatch.detectedCatno}",
+                                color = Color(0xFF81D4FA),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Sources checked: Local MusicBrainz (5.67M releases), Remote MusicBrainz, and Discogs API.",
+                        color = TextTertiary,
+                        fontSize = 11.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.resumeScanning() },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = VinylGold, contentColor = Color.Black),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Scan Again", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                searchQuery = noMatch.detectedCatno ?: noMatch.scannedValue
+                                viewModel.resumeScanning()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Edit in Search", color = VinylGold, fontSize = 12.sp)
+                        }
                     }
                 }
             }

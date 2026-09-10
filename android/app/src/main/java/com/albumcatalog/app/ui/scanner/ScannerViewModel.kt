@@ -16,7 +16,12 @@ sealed class MatchUiState {
     object Idle : MatchUiState()
     object Matching : MatchUiState()
     data class MatchesFound(val candidates: List<MatchCandidate>, val sourceUsed: String) : MatchUiState()
-    data class NoMatch(val reason: String) : MatchUiState()
+    data class NoMatch(
+        val queryType: String,
+        val scannedValue: String,
+        val detectedCatno: String? = null,
+        val details: String = "No matching release found."
+    ) : MatchUiState()
     data class Error(val message: String) : MatchUiState()
 }
 
@@ -75,7 +80,6 @@ class ScannerViewModel(
 
     fun onBarcodeDetected(barcode: String) {
         if (!_isScanningActive.value) return
-        // Stop scanning immediately upon detection
         _isScanningActive.value = false
         _matchState.value = MatchUiState.Matching
 
@@ -88,7 +92,11 @@ class ScannerViewModel(
                         sourceUsed = response.sourceUsed
                     )
                 } else {
-                    _matchState.value = MatchUiState.NoMatch("No release found for barcode: $barcode")
+                    _matchState.value = MatchUiState.NoMatch(
+                        queryType = "Barcode (UPC/EAN)",
+                        scannedValue = barcode,
+                        details = "Searched Local MusicBrainz, Remote MusicBrainz, and Discogs for barcode '$barcode'."
+                    )
                 }
             }.onFailure { error ->
                 _matchState.value = MatchUiState.Error(error.localizedMessage ?: "Failed to match barcode")
@@ -98,7 +106,6 @@ class ScannerViewModel(
 
     fun onLabelDetected(fullText: String, catno: String?) {
         if (!_isScanningActive.value) return
-        // Stop scanning immediately upon detection
         _isScanningActive.value = false
         _matchState.value = MatchUiState.Matching
 
@@ -111,7 +118,12 @@ class ScannerViewModel(
                         sourceUsed = response.sourceUsed
                     )
                 } else {
-                    _matchState.value = MatchUiState.NoMatch("No release found for label text")
+                    _matchState.value = MatchUiState.NoMatch(
+                        queryType = "Vinyl Center Label OCR",
+                        scannedValue = fullText,
+                        detectedCatno = catno,
+                        details = "Extracted catalog number '${catno ?: "None detected"}' from label text and searched Local MusicBrainz, Remote MusicBrainz, and Discogs."
+                    )
                 }
             }.onFailure { error ->
                 _matchState.value = MatchUiState.Error(error.localizedMessage ?: "Failed to match label text")
@@ -133,7 +145,11 @@ class ScannerViewModel(
                         sourceUsed = response.sourceUsed
                     )
                 } else {
-                    _matchState.value = MatchUiState.NoMatch("No matches found for: $query")
+                    _matchState.value = MatchUiState.NoMatch(
+                        queryType = "Manual Search Query",
+                        scannedValue = query,
+                        details = "Searched artist, title, and catalog number for '$query'."
+                    )
                 }
             }.onFailure { error ->
                 _matchState.value = MatchUiState.Error(error.localizedMessage ?: "Search failed")
@@ -193,7 +209,7 @@ class ScannerViewModel(
             thumbnailUrl = candidate.thumbnailUrl,
             mediaCondition = "VG+",
             sleeveCondition = "VG+",
-            shelfLocation = "Main Crate",
+            purchasePrice = null,
             tracks = candidate.tracks
         )
     }

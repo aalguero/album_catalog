@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
@@ -22,6 +24,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -56,7 +60,7 @@ fun StagedAlbumConfirmationCard(
 ) {
     var mediaCondition by remember { mutableStateOf(album.mediaCondition ?: "VG+") }
     var sleeveCondition by remember { mutableStateOf(album.sleeveCondition ?: "VG+") }
-    var shelfLocation by remember { mutableStateOf(album.shelfLocation ?: "Main Crate") }
+    var purchasePrice by remember { mutableStateOf(album.purchasePrice?.toString() ?: "") }
     var notes by remember { mutableStateOf(album.notes ?: "") }
 
     Box(
@@ -143,12 +147,24 @@ fun StagedAlbumConfirmationCard(
                 onGradeSelected = { sleeveCondition = it }
             )
 
+            // Price Paid (Prominent & always asked when cataloging)
             OutlinedTextField(
-                value = shelfLocation,
-                onValueChange = { shelfLocation = it },
-                label = { Text("Shelf / Crate Location") },
+                value = purchasePrice,
+                onValueChange = { purchasePrice = it },
+                label = { Text("Price Paid ($) *", fontWeight = FontWeight.SemiBold) },
+                placeholder = { Text("e.g. 24.99") },
+                leadingIcon = {
+                    Icon(Icons.Default.AttachMoney, contentDescription = null, tint = VinylGold)
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VinylGold,
+                    unfocusedBorderColor = VinylBorder,
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary
+                )
             )
 
             // Confirmation Actions
@@ -161,7 +177,7 @@ fun StagedAlbumConfirmationCard(
                         val finalized = album.copy(
                             mediaCondition = mediaCondition,
                             sleeveCondition = sleeveCondition,
-                            shelfLocation = shelfLocation.ifEmpty { null },
+                            purchasePrice = purchasePrice.toDoubleOrNull(),
                             notes = notes.ifEmpty { null }
                         )
                         onConfirm(finalized)
