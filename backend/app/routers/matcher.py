@@ -10,7 +10,7 @@ from app.services.musicbrainz_local import (
     search_by_artist_title
 )
 from app.services.musicbrainz_remote import search_remote_musicbrainz
-from app.services.discogs_client import fetch_discogs_pressings
+from app.services.discogs_client import fetch_discogs_pressings, search_discogs_direct
 from app.services.ranker import extract_potential_catno, rank_and_select_top_candidates
 
 router = APIRouter(prefix="/api/match", tags=["Matcher"])
@@ -35,6 +35,11 @@ async def scan_metadata(
             candidates = await search_remote_musicbrainz(barcode=req.barcode)
             if candidates:
                 source_used = "remote_musicbrainz"
+            else:
+                # Fallback to direct Discogs search
+                candidates = await search_discogs_direct(barcode=req.barcode)
+                if candidates:
+                    source_used = "discogs"
 
     # 2. Catalog Number
     elif req.catalog_number:
@@ -46,10 +51,14 @@ async def scan_metadata(
             candidates = await search_remote_musicbrainz(catalog_number=req.catalog_number)
             if candidates:
                 source_used = "remote_musicbrainz"
+            else:
+                candidates = await search_discogs_direct(catno=req.catalog_number)
+                if candidates:
+                    source_used = "discogs"
 
-    # 3. Spine text OCR
+    # 3. Center label / text OCR
     elif req.spine_text:
-        query_type = "spine_text"
+        query_type = "label_text"
         extracted_catno = extract_potential_catno(req.spine_text)
         if extracted_catno:
             candidates = await search_by_catalog_number(conn, extracted_catno)
@@ -64,6 +73,10 @@ async def scan_metadata(
             )
             if candidates:
                 source_used = "remote_musicbrainz"
+            else:
+                candidates = await search_discogs_direct(query=req.spine_text)
+                if candidates:
+                    source_used = "discogs"
 
     # 4. Explicit Artist + Title
     elif req.artist and req.title:
@@ -75,6 +88,10 @@ async def scan_metadata(
             candidates = await search_remote_musicbrainz(artist=req.artist, title=req.title)
             if candidates:
                 source_used = "remote_musicbrainz"
+            else:
+                candidates = await search_discogs_direct(query=f"{req.artist} {req.title}")
+                if candidates:
+                    source_used = "discogs"
 
     top3 = rank_and_select_top_candidates(
         candidates,
