@@ -3,6 +3,7 @@ package com.albumcatalog.app.ui.catalog
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.albumcatalog.app.data.model.Album
+import com.albumcatalog.app.data.model.DiscogsPressingOption
 import com.albumcatalog.app.data.repository.VinylRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +28,9 @@ class CatalogViewModel(
 
     private val _pressingFilter = MutableStateFlow<String?>(null)
     val pressingFilter: StateFlow<String?> = _pressingFilter.asStateFlow()
+
+    private val _statusMessage = MutableStateFlow<String?>(null)
+    val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
 
     init {
         loadAlbums()
@@ -57,10 +61,45 @@ class CatalogViewModel(
         loadAlbums()
     }
 
+    fun addConfirmedAlbum(album: Album, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            val result = repository.addToCatalog(album)
+            result.onSuccess { saved ->
+                _statusMessage.value = "Added '${saved.title}' to your collection!"
+                loadAlbums()
+                onComplete()
+            }.onFailure { err ->
+                _statusMessage.value = "Failed to add album: ${err.localizedMessage}"
+            }
+        }
+    }
+
+    fun updateAlbum(id: Int, updatedAlbum: Album, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            val result = repository.updateAlbum(id, updatedAlbum)
+            result.onSuccess { saved ->
+                _statusMessage.value = "Updated '${saved.title}'"
+                loadAlbums()
+                onComplete()
+            }.onFailure { err ->
+                _statusMessage.value = "Update failed: ${err.localizedMessage}"
+            }
+        }
+    }
+
     fun deleteAlbum(id: Int) {
         viewModelScope.launch {
             repository.deleteAlbum(id)
             loadAlbums()
         }
+    }
+
+    suspend fun fetchDiscogsPressings(artist: String, title: String, catno: String?, barcode: String?): List<DiscogsPressingOption> {
+        val res = repository.fetchDiscogsPressings(artist, title, catno, barcode)
+        return res.getOrDefault(emptyList())
+    }
+
+    fun clearStatusMessage() {
+        _statusMessage.value = null
     }
 }

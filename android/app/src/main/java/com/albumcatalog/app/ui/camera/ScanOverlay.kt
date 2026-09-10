@@ -8,13 +8,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -30,6 +25,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -38,20 +34,20 @@ import androidx.compose.ui.unit.sp
 
 enum class ScanMode {
     BARCODE,
-    SPINE_TEXT
+    VINYL_LABEL
 }
 
 @Composable
 fun ScanOverlay(
     scanMode: ScanMode,
-    isScanning: Boolean = true
+    isScanningActive: Boolean = true
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "laser")
     val laserPosition by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1600, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "laser_y"
@@ -61,70 +57,111 @@ fun ScanOverlay(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val width = size.width
             val height = size.height
-
-            // Dimensions for viewfinder rect
-            val rectWidth: Float
-            val rectHeight: Float
-            val topOffset: Float
+            val centerX = width / 2f
+            val centerY = height * 0.45f
 
             if (scanMode == ScanMode.BARCODE) {
-                // Square-ish box for barcode
-                rectWidth = width * 0.75f
-                rectHeight = rectWidth * 0.65f
-                topOffset = (height - rectHeight) * 0.40f
-            } else {
-                // Slender horizontal slit for album spine
-                rectWidth = width * 0.88f
-                rectHeight = 110.dp.toPx()
-                topOffset = (height - rectHeight) * 0.42f
-            }
+                // Barcode box
+                val rectWidth = width * 0.78f
+                val rectHeight = rectWidth * 0.60f
+                val left = (width - rectWidth) / 2f
+                val top = centerY - (rectHeight / 2f)
 
-            val leftOffset = (width - rectWidth) / 2f
-
-            val holePath = Path().apply {
-                addRoundRect(
-                    RoundRect(
-                        rect = Rect(
-                            offset = Offset(leftOffset, topOffset),
-                            size = Size(rectWidth, rectHeight)
-                        ),
-                        cornerRadius = CornerRadius(16.dp.toPx())
+                val holePath = Path().apply {
+                    addRoundRect(
+                        RoundRect(
+                            rect = Rect(Offset(left, top), Size(rectWidth, rectHeight)),
+                            cornerRadius = CornerRadius(16.dp.toPx())
+                        )
                     )
+                }
+
+                // Darken outside
+                clipPath(holePath, clipOp = ClipOp.Difference) {
+                    drawRect(Color.Black.copy(alpha = 0.55f))
+                }
+
+                // Border
+                drawRoundRect(
+                    color = if (isScanningActive) Color(0xFFFFB74D) else Color(0xFF757575),
+                    topLeft = Offset(left, top),
+                    size = Size(rectWidth, rectHeight),
+                    cornerRadius = CornerRadius(16.dp.toPx()),
+                    style = Stroke(width = 3.dp.toPx())
                 )
-            }
 
-            // Darken outside viewfinder
-            clipPath(holePath, clipOp = ClipOp.Difference) {
-                drawRect(Color.Black.copy(alpha = 0.55f))
-            }
+                // Laser scan line
+                if (isScanningActive) {
+                    val laserY = top + (rectHeight * laserPosition)
+                    drawLine(
+                        color = Color(0xFFFF7043),
+                        start = Offset(left + 8.dp.toPx(), laserY),
+                        end = Offset(left + rectWidth - 8.dp.toPx(), laserY),
+                        strokeWidth = 2.5.dp.toPx()
+                    )
+                }
+            } else {
+                // Circular Vinyl Center Label
+                val labelRadius = width * 0.38f
+                val spindleRadius = 14.dp.toPx()
 
-            // Target frame border
-            drawRoundRect(
-                color = if (scanMode == ScanMode.BARCODE) Color(0xFFFFB74D) else Color(0xFF64B5F6),
-                topLeft = Offset(leftOffset, topOffset),
-                size = Size(rectWidth, rectHeight),
-                cornerRadius = CornerRadius(16.dp.toPx()),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx())
-            )
+                val circlePath = Path().apply {
+                    addOval(
+                        Rect(
+                            center = Offset(centerX, centerY),
+                            radius = labelRadius
+                        )
+                    )
+                }
 
-            // Animated scanline
-            if (isScanning) {
-                val laserY = topOffset + (rectHeight * laserPosition)
-                drawLine(
-                    color = if (scanMode == ScanMode.BARCODE) Color(0xFFFF7043) else Color(0xFF42A5F5),
-                    start = Offset(leftOffset + 8.dp.toPx(), laserY),
-                    end = Offset(leftOffset + rectWidth - 8.dp.toPx(), laserY),
-                    strokeWidth = 2.5.dp.toPx()
+                clipPath(circlePath, clipOp = ClipOp.Difference) {
+                    drawRect(Color.Black.copy(alpha = 0.55f))
+                }
+
+                // Outer circle for label edge
+                drawCircle(
+                    color = if (isScanningActive) Color(0xFF64B5F6) else Color(0xFF757575),
+                    radius = labelRadius,
+                    center = Offset(centerX, centerY),
+                    style = Stroke(width = 3.dp.toPx())
                 )
+
+                // Center spindle hole
+                drawCircle(
+                    color = if (isScanningActive) Color(0xFF90CAF9) else Color(0xFF9E9E9E),
+                    radius = spindleRadius,
+                    center = Offset(centerX, centerY),
+                    style = Stroke(width = 2.dp.toPx())
+                )
+
+                // Crosshairs for center alignment
+                if (isScanningActive) {
+                    val crosshairLen = 22.dp.toPx()
+                    drawLine(
+                        color = Color(0xFF90CAF9).copy(alpha = 0.7f),
+                        start = Offset(centerX - crosshairLen, centerY),
+                        end = Offset(centerX + crosshairLen, centerY),
+                        strokeWidth = 1.5.dp.toPx()
+                    )
+                    drawLine(
+                        color = Color(0xFF90CAF9).copy(alpha = 0.7f),
+                        start = Offset(centerX, centerY - crosshairLen),
+                        end = Offset(centerX, centerY + crosshairLen),
+                        strokeWidth = 1.5.dp.toPx()
+                    )
+                }
             }
         }
 
         // Hint Label
         Text(
-            text = if (scanMode == ScanMode.BARCODE)
+            text = if (!isScanningActive) {
+                "Scanning paused"
+            } else if (scanMode == ScanMode.BARCODE) {
                 "Center vinyl barcode in frame"
-            else
-                "Align spine text & catalog number in frame",
+            } else {
+                "Center vinyl record label inside circle"
+            },
             color = Color.White,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,

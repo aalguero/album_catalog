@@ -27,19 +27,15 @@ sealed class DiscogsUiState {
     data class Error(val message: String) : DiscogsUiState()
 }
 
-sealed class SaveUiState {
-    object Idle : SaveUiState()
-    object Saving : SaveUiState()
-    data class Success(val album: Album) : SaveUiState()
-    data class Error(val message: String) : SaveUiState()
-}
-
 class ScannerViewModel(
     private val repository: VinylRepository = VinylRepository()
 ) : ViewModel() {
 
     private val _scanMode = MutableStateFlow(ScanMode.BARCODE)
     val scanMode: StateFlow<ScanMode> = _scanMode.asStateFlow()
+
+    private val _isScanningActive = MutableStateFlow(true)
+    val isScanningActive: StateFlow<Boolean> = _isScanningActive.asStateFlow()
 
     private val _isTorchOn = MutableStateFlow(false)
     val isTorchOn: StateFlow<Boolean> = _isTorchOn.asStateFlow()
@@ -50,10 +46,7 @@ class ScannerViewModel(
     private val _discogsState = MutableStateFlow<DiscogsUiState>(DiscogsUiState.Hidden)
     val discogsState: StateFlow<DiscogsUiState> = _discogsState.asStateFlow()
 
-    private val _saveState = MutableStateFlow<SaveUiState>(SaveUiState.Idle)
-    val saveState: StateFlow<SaveUiState> = _saveState.asStateFlow()
-
-    // Staging for album saving
+    // Staged items
     var stagedCandidate: MatchCandidate? = null
         private set
     var stagedPressing: DiscogsPressingOption? = null
@@ -68,8 +61,22 @@ class ScannerViewModel(
         _isTorchOn.value = !_isTorchOn.value
     }
 
+    fun resumeScanning() {
+        _isScanningActive.value = true
+        _matchState.value = MatchUiState.Idle
+        _discogsState.value = DiscogsUiState.Hidden
+        stagedCandidate = null
+        stagedPressing = null
+    }
+
+    fun pauseScanning() {
+        _isScanningActive.value = false
+    }
+
     fun onBarcodeDetected(barcode: String) {
-        if (_matchState.value is MatchUiState.Matching) return
+        if (!_isScanningActive.value) return
+        // Stop scanning immediately upon detection
+        _isScanningActive.value = false
         _matchState.value = MatchUiState.Matching
 
         viewModelScope.launch {
@@ -89,12 +96,14 @@ class ScannerViewModel(
         }
     }
 
-    fun onSpineTextRecognized(fullText: String, catno: String?) {
-        if (_matchState.value is MatchUiState.Matching) return
+    fun onLabelDetected(fullText: String, catno: String?) {
+        if (!_isScanningActive.value) return
+        // Stop scanning immediately upon detection
+        _isScanningActive.value = false
         _matchState.value = MatchUiState.Matching
 
         viewModelScope.launch {
-            val result = repository.scanSpineText(catno ?: fullText)
+            val result = repository.scanVinylLabel(fullText, catno)
             result.onSuccess { response ->
                 if (response.candidates.isNotEmpty()) {
                     _matchState.value = MatchUiState.MatchesFound(
@@ -102,16 +111,17 @@ class ScannerViewModel(
                         sourceUsed = response.sourceUsed
                     )
                 } else {
-                    _matchState.value = MatchUiState.NoMatch("No release found for spine text")
+                    _matchState.value = MatchUiState.NoMatch("No release found for label text")
                 }
             }.onFailure { error ->
-                _matchState.value = MatchUiState.Error(error.localizedMessage ?: "Failed to match spine text")
+                _matchState.value = MatchUiState.Error(error.localizedMessage ?: "Failed to match label text")
             }
         }
     }
 
     fun performManualSearch(query: String) {
         if (query.isBlank()) return
+        _isScanningActive.value = false
         _matchState.value = MatchUiState.Matching
 
         viewModelScope.launch {
@@ -164,27 +174,35 @@ class ScannerViewModel(
         _discogsState.value = DiscogsUiState.Hidden
     }
 
-    fun saveToCatalog(album: Album) {
-        _saveState.value = SaveUiState.Saving
-        viewModelScope.launch {
-            val result = repository.addToCatalog(album)
-            result.onSuccess { saved ->
-                _saveState.value = SaveUiState.Success(saved)
-                resetMatchState()
-            }.onFailure { error ->
-                _saveState.value = SaveUiState.Error(error.localizedMessage ?: "Failed to save album")
-            }
-        }
+    fun buildStagedAlbum(candidate: MatchCandidate, pressing: DiscogsPressingOption? = stagedPressing): Album {
+        return Album(
+            title = candidate.title,
+            artist = candidate.artist,
+            releaseYear = pressing?.year ?: candidate.releaseYear,
+            label = pressing?.label ?: candidate.label,
+            catalogNumber = pressing?.catalogNumber ?: candidate.catalogNumber,
+            barcode = candidate.barcode,
+            country = pressing?.country ?: candidate.country,
+            format = candidate.format,
+            pressingStatus = if (pressing != null) "specific" else "unspecific",
+            metadataSource = if (pressing != null) "discogs" else candidate.source,
+            musicbrainzReleaseId = candidate.musicbrainzReleaseId,
+            discogsReleaseId = pressing?.discogsId ?: candidate.discogsReleaseId,
+            discogsMasterId = candidate.discogsMasterId,
+            coverImageUrl = candidate.coverImageUrl ?: pressing?.coverImage,
+            thumbnailUrl = candidate.thumbnailUrl,
+            mediaCondition = "VG+",
+            sleeveCondition = "VG+",
+            shelfLocation = "Main Crate",
+            tracks = candidate.tracks
+        )
     }
 
     fun resetMatchState() {
         _matchState.value = MatchUiState.Idle
         _discogsState.value = DiscogsUiState.Hidden
+        _isScanningActive.value = true
         stagedCandidate = null
         stagedPressing = null
-    }
-
-    fun clearSaveState() {
-        _saveState.value = SaveUiState.Idle
     }
 }

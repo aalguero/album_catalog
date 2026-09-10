@@ -1,8 +1,11 @@
 package com.albumcatalog.app.ui.camera
 
+import android.util.Size
+import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -22,9 +25,10 @@ import java.util.concurrent.Executors
 @Composable
 fun CameraPreviewView(
     scanMode: ScanMode,
+    isScanningActive: Boolean,
     isTorchOn: Boolean,
     onBarcodeDetected: (String) -> Unit,
-    onSpineTextRecognized: (String, String?) -> Unit,
+    onLabelDetected: (String, String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -46,7 +50,7 @@ fun CameraPreviewView(
         camera?.cameraControl?.enableTorch(isTorchOn)
     }
 
-    LaunchedEffect(scanMode) {
+    LaunchedEffect(scanMode, isScanningActive) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
@@ -54,27 +58,53 @@ fun CameraPreviewView(
                 it.surfaceProvider = previewView.surfaceProvider
             }
 
+            // High resolution (1080p) analysis for high-density vinyl barcodes
             val imageAnalysis = ImageAnalysis.Builder()
+                .setTargetResolution(Size(1920, 1080))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
 
             if (scanMode == ScanMode.BARCODE) {
-                imageAnalysis.setAnalyzer(cameraExecutor, BarcodeAnalyzer(onBarcodeDetected))
+                imageAnalysis.setAnalyzer(
+                    cameraExecutor,
+                    BarcodeAnalyzer(
+                        isScanningEnabled = { isScanningActive },
+                        onBarcodeDetected = onBarcodeDetected
+                    )
+                )
             } else {
-                imageAnalysis.setAnalyzer(cameraExecutor, SpineTextAnalyzer(onSpineTextRecognized))
+                imageAnalysis.setAnalyzer(
+                    cameraExecutor,
+                    VinylLabelAnalyzer(
+                        isScanningEnabled = { isScanningActive },
+                        onLabelDetected = onLabelDetected
+                    )
+                )
             }
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
                 cameraProvider.unbindAll()
-                camera = cameraProvider.bindToLifecycle(
+                val boundCamera = cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     cameraSelector,
                     preview,
                     imageAnalysis
                 )
-                camera?.cameraControl?.enableTorch(isTorchOn)
+                camera = boundCamera
+                boundCamera.cameraControl.enableTorch(isTorchOn)
+
+                // Enable tap-to-focus on preview
+                previewView.setOnTouchListener { _, event ->
+                    if (event.action == MotionEvent.ACTION_UP) {
+                        val factory = previewView.meteringPointFactory
+                        val point = factory.createPoint(event.x, event.y)
+                        val action = FocusMeteringAction.Builder(point).build()
+                        boundCamera.cameraControl.startFocusAndMetering(action)
+                    }
+                    true
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

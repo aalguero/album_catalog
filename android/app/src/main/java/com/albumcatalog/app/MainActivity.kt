@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.albumcatalog.app.data.model.Album
 import com.albumcatalog.app.ui.catalog.CatalogScreen
 import com.albumcatalog.app.ui.scanner.ScannerScreen
 import com.albumcatalog.app.ui.settings.SettingsScreen
@@ -73,6 +74,8 @@ class MainActivity : ComponentActivity() {
 fun MainAppScaffold() {
     val context = LocalContext.current
     var currentTab by remember { mutableStateOf(AppTab.SCAN) }
+    var stagedAlbumForConfirmation by remember { mutableStateOf<Album?>(null) }
+
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -151,7 +154,12 @@ fun MainAppScaffold() {
             when (currentTab) {
                 AppTab.SCAN -> {
                     if (hasCameraPermission) {
-                        ScannerScreen()
+                        ScannerScreen(
+                            onCandidateSelectedForConfirmation = { album ->
+                                stagedAlbumForConfirmation = album
+                                currentTab = AppTab.CATALOG
+                            }
+                        )
                     } else {
                         CameraPermissionDeniedView(
                             onRequestPermission = {
@@ -161,7 +169,18 @@ fun MainAppScaffold() {
                     }
                 }
                 AppTab.CATALOG -> {
-                    CatalogScreen()
+                    CatalogScreen(
+                        stagedAlbum = stagedAlbumForConfirmation,
+                        onConfirmStagedAlbum = {
+                            stagedAlbumForConfirmation = null
+                            // Stays in CATALOG tab
+                        },
+                        onRejectStagedAlbum = {
+                            stagedAlbumForConfirmation = null
+                            // Returns to SCAN tab
+                            currentTab = AppTab.SCAN
+                        }
+                    )
                 }
                 AppTab.SETTINGS -> {
                     SettingsScreen()
@@ -198,7 +217,7 @@ fun CameraPermissionDeniedView(
                 color = TextPrimary
             )
             Text(
-                text = "To scan album barcodes and spine text, please grant camera access.",
+                text = "To scan album barcodes and vinyl center labels, please grant camera access.",
                 fontSize = 14.sp,
                 color = TextSecondary,
                 textAlign = TextAlign.Center

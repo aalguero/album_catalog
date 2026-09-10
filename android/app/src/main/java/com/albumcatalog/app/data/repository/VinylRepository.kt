@@ -21,10 +21,22 @@ class VinylRepository {
         }
     }
 
-    suspend fun scanSpineText(spineText: String): Result<ScanResponse> = withContext(Dispatchers.IO) {
+    suspend fun scanVinylLabel(fullText: String, catno: String? = null): Result<ScanResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = api.scan(ScanRequest(spineText = spineText.trim()))
+            val response = api.scan(ScanRequest(
+                spineText = fullText.trim(),
+                catalogNumber = catno?.trim()
+            ))
             Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateAlbum(id: Int, album: Album): Result<Album> = withContext(Dispatchers.IO) {
+        try {
+            val updated = api.updateAlbum(id, album)
+            Result.success(updated)
         } catch (e: Exception) {
             Result.failure(e)
         }
