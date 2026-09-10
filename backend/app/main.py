@@ -40,6 +40,7 @@ async def root():
         "version": "1.0.0"
     }
 
+@app.get("/health")
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
