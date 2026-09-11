@@ -14,7 +14,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -29,12 +32,16 @@ fun CameraPreviewView(
     isTorchOn: Boolean,
     onBarcodeDetected: (String) -> Unit,
     onLabelDetected: (String, String?) -> Unit,
+    onLabelScanStateChanged: ((LabelScanState) -> Unit)? = null,
+    manualCaptureTrigger: Long = 0L,
+    onManualCaptureResult: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var camera: Camera? = remember { null }
+    var currentLabelAnalyzer by remember { mutableStateOf<VinylLabelAnalyzer?>(null) }
 
     val previewView = remember {
         PreviewView(context).apply {
@@ -45,6 +52,8 @@ fun CameraPreviewView(
             scaleType = PreviewView.ScaleType.FILL_CENTER
         }
     }
+
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
     LaunchedEffect(isTorchOn) {
         camera?.cameraControl?.enableTorch(isTorchOn)
@@ -61,22 +70,67 @@ fun CameraPreviewView(
     LaunchedEffect(lifecycleOwner) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().also {
-                it.surfaceProvider = previewView.surfaceProvider
-            }
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
             try {
-                cameraProvider.unbindAll()
-                val boundCamera = cameraProvider.bindToLifecycle(
+                cameraProvider = cameraProviderFuture.get()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }, ContextCompat.getMainExecutor(context))
+    }
+
+    // Dynamic Camera Lifecycle: Shut down physical camera sensor when scanning is paused/lookup in progress
+    LaunchedEffect(cameraProvider, isScanningActive, scanMode) {
+        val provider = cameraProvider ?: return@LaunchedEffect
+
+        if (!isScanningActive) {
+            try {
+                camera?.cameraControl?.enableTorch(false)
+                currentLabelAnalyzer = null
+                imageAnalysis.clearAnalyzer()
+                provider.unbindAll()
+                camera = null
+                onLabelScanStateChanged?.invoke(LabelScanState(LabelScanStatus.SEARCHING, 0f))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        } else {
+            try {
+                provider.unbindAll()
+
+                val preview = Preview.Builder().build().also {
+                    it.surfaceProvider = previewView.surfaceProvider
+                }
+                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+                if (scanMode == ScanMode.BARCODE) {
+                    currentLabelAnalyzer = null
+                    imageAnalysis.setAnalyzer(
+                        cameraExecutor,
+                        BarcodeAnalyzer(
+                            isScanningEnabled = { isScanningActive },
+                            onBarcodeDetected = onBarcodeDetected
+                        )
+                    )
+                } else {
+                    val analyzer = VinylLabelAnalyzer(
+                        isScanningEnabled = { isScanningActive },
+                        onLabelDetected = onLabelDetected,
+                        onScanStateChanged = onLabelScanStateChanged
+                    )
+                    currentLabelAnalyzer = analyzer
+                    imageAnalysis.setAnalyzer(cameraExecutor, analyzer)
+                }
+
+                val boundCamera = provider.bindToLifecycle(
                     lifecycleOwner,
                     cameraSelector,
                     preview,
                     imageAnalysis
                 )
                 camera = boundCamera
-                boundCamera.cameraControl.enableTorch(isTorchOn)
+                if (isTorchOn) {
+                    boundCamera.cameraControl.enableTorch(true)
+                }
 
                 // Enable tap-to-focus on preview
                 previewView.setOnTouchListener { _, event ->
@@ -91,36 +145,25 @@ fun CameraPreviewView(
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }, ContextCompat.getMainExecutor(context))
+        }
     }
 
-    LaunchedEffect(scanMode, isScanningActive) {
-        if (!isScanningActive) {
-            imageAnalysis.clearAnalyzer()
-        } else {
-            if (scanMode == ScanMode.BARCODE) {
-                imageAnalysis.setAnalyzer(
-                    cameraExecutor,
-                    BarcodeAnalyzer(
-                        isScanningEnabled = { isScanningActive },
-                        onBarcodeDetected = onBarcodeDetected
-                    )
-                )
-            } else {
-                imageAnalysis.setAnalyzer(
-                    cameraExecutor,
-                    VinylLabelAnalyzer(
-                        isScanningEnabled = { isScanningActive },
-                        onLabelDetected = onLabelDetected
-                    )
-                )
-            }
+    LaunchedEffect(manualCaptureTrigger) {
+        if (manualCaptureTrigger > 0L) {
+            val success = currentLabelAnalyzer?.triggerManualCapture() ?: false
+            onManualCaptureResult?.invoke(success)
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            cameraExecutor.shutdown()
+            try {
+                camera?.cameraControl?.enableTorch(false)
+                cameraProvider?.unbindAll()
+                cameraExecutor.shutdown()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 

@@ -6,6 +6,7 @@ import com.albumcatalog.app.data.model.Album
 import com.albumcatalog.app.data.model.DiscogsPressingOption
 import com.albumcatalog.app.data.model.MatchCandidate
 import com.albumcatalog.app.data.repository.VinylRepository
+import com.albumcatalog.app.ui.camera.LabelScanState
 import com.albumcatalog.app.ui.camera.ScanMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,6 +71,12 @@ class ScannerViewModel(
     private val _ocrCorrectionState = MutableStateFlow(OcrCorrectionState())
     val ocrCorrectionState: StateFlow<OcrCorrectionState> = _ocrCorrectionState.asStateFlow()
 
+    private val _labelScanState = MutableStateFlow(LabelScanState())
+    val labelScanState: StateFlow<LabelScanState> = _labelScanState.asStateFlow()
+
+    private val _manualCaptureTrigger = MutableStateFlow(0L)
+    val manualCaptureTrigger: StateFlow<Long> = _manualCaptureTrigger.asStateFlow()
+
     // Staged items
     var stagedCandidate: MatchCandidate? = null
         private set
@@ -85,11 +92,20 @@ class ScannerViewModel(
         _isTorchOn.value = !_isTorchOn.value
     }
 
+    fun updateLabelScanState(state: LabelScanState) {
+        _labelScanState.value = state
+    }
+
+    fun triggerManualCapture() {
+        _manualCaptureTrigger.value = System.currentTimeMillis()
+    }
+
     fun resumeScanning() {
         _isScanningActive.value = true
         _matchState.value = MatchUiState.Idle
         _discogsState.value = DiscogsUiState.Hidden
         _ocrCorrectionState.value = OcrCorrectionState(isVisible = false)
+        _labelScanState.value = LabelScanState()
         stagedCandidate = null
         stagedPressing = null
     }
@@ -332,6 +348,7 @@ class ScannerViewModel(
         _matchState.value = MatchUiState.Idle
         _discogsState.value = DiscogsUiState.Hidden
         _ocrCorrectionState.value = OcrCorrectionState(isVisible = false)
+        _labelScanState.value = LabelScanState()
         _isScanningActive.value = true
         stagedCandidate = null
         stagedPressing = null

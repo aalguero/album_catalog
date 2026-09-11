@@ -32,6 +32,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import androidx.compose.ui.graphics.StrokeCap
+
 enum class ScanMode {
     BARCODE,
     VINYL_LABEL
@@ -40,7 +42,8 @@ enum class ScanMode {
 @Composable
 fun ScanOverlay(
     scanMode: ScanMode,
-    isScanningActive: Boolean = true
+    isScanningActive: Boolean = true,
+    labelScanState: LabelScanState = LabelScanState()
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "laser")
     val laserPosition by infiniteTransition.animateFloat(
@@ -118,17 +121,39 @@ fun ScanOverlay(
                     drawRect(Color.Black.copy(alpha = 0.55f))
                 }
 
+                // Dynamic reticle color based on alignment state
+                val reticleColor = when {
+                    !isScanningActive -> Color(0xFF757575)
+                    labelScanState.status == LabelScanStatus.LOCKED -> Color(0xFF66BB6A) // Green
+                    labelScanState.status == LabelScanStatus.STABILIZING -> Color(0xFFFFB74D) // Gold
+                    labelScanState.status == LabelScanStatus.CENTERING -> Color(0xFFFF9800) // Amber
+                    else -> Color(0xFF64B5F6) // Blue
+                }
+
                 // Outer circle for label edge
                 drawCircle(
-                    color = if (isScanningActive) Color(0xFF64B5F6) else Color(0xFF757575),
+                    color = reticleColor.copy(alpha = if (labelScanState.status == LabelScanStatus.STABILIZING) 0.35f else 1f),
                     radius = labelRadius,
                     center = Offset(centerX, centerY),
                     style = Stroke(width = 3.dp.toPx())
                 )
 
+                // Animated filling progress ring during stabilization
+                if (isScanningActive && labelScanState.status == LabelScanStatus.STABILIZING && labelScanState.progress > 0f) {
+                    drawArc(
+                        color = Color(0xFFFFD54F),
+                        startAngle = -90f,
+                        sweepAngle = labelScanState.progress * 360f,
+                        useCenter = false,
+                        topLeft = Offset(centerX - labelRadius, centerY - labelRadius),
+                        size = Size(labelRadius * 2, labelRadius * 2),
+                        style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+
                 // Center spindle hole
                 drawCircle(
-                    color = if (isScanningActive) Color(0xFF90CAF9) else Color(0xFF9E9E9E),
+                    color = if (isScanningActive) reticleColor.copy(alpha = 0.8f) else Color(0xFF9E9E9E),
                     radius = spindleRadius,
                     center = Offset(centerX, centerY),
                     style = Stroke(width = 2.dp.toPx())
@@ -138,13 +163,13 @@ fun ScanOverlay(
                 if (isScanningActive) {
                     val crosshairLen = 22.dp.toPx()
                     drawLine(
-                        color = Color(0xFF90CAF9).copy(alpha = 0.7f),
+                        color = reticleColor.copy(alpha = 0.7f),
                         start = Offset(centerX - crosshairLen, centerY),
                         end = Offset(centerX + crosshairLen, centerY),
                         strokeWidth = 1.5.dp.toPx()
                     )
                     drawLine(
-                        color = Color(0xFF90CAF9).copy(alpha = 0.7f),
+                        color = reticleColor.copy(alpha = 0.7f),
                         start = Offset(centerX, centerY - crosshairLen),
                         end = Offset(centerX, centerY + crosshairLen),
                         strokeWidth = 1.5.dp.toPx()
@@ -155,12 +180,13 @@ fun ScanOverlay(
 
         // Hint Label
         Text(
-            text = if (!isScanningActive) {
-                "Scanning paused"
-            } else if (scanMode == ScanMode.BARCODE) {
-                "Center vinyl barcode in frame"
-            } else {
-                "Center vinyl record label inside circle"
+            text = when {
+                !isScanningActive -> "Scanning paused"
+                scanMode == ScanMode.BARCODE -> "Center vinyl barcode in frame"
+                labelScanState.status == LabelScanStatus.LOCKED -> "Label locked! Matching..."
+                labelScanState.status == LabelScanStatus.STABILIZING -> "Hold steady... scanning label"
+                labelScanState.status == LabelScanStatus.CENTERING -> "Center label spindle hole on crosshairs"
+                else -> "Center vinyl record label inside circle"
             },
             color = Color.White,
             fontSize = 14.sp,

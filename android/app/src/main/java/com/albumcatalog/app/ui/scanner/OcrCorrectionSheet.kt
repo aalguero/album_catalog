@@ -62,10 +62,10 @@ fun OcrCorrectionSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var catno by remember { mutableStateOf(initialCatno) }
-    var artist by remember { mutableStateOf(initialArtist) }
-    var title by remember { mutableStateOf(initialTitle) }
-    var rawText by remember { mutableStateOf(initialRawText) }
+    var catno by remember(initialCatno) { mutableStateOf(initialCatno) }
+    var artist by remember(initialArtist) { mutableStateOf(initialArtist) }
+    var title by remember(initialTitle) { mutableStateOf(initialTitle) }
+    var rawText by remember(initialRawText) { mutableStateOf(initialRawText) }
     var label by remember { mutableStateOf("") }
     var yearStr by remember { mutableStateOf("") }
     var showRawText by remember { mutableStateOf(true) }

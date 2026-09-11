@@ -124,6 +124,12 @@ flowchart TD
     - **Country of Origin**: US, UK, Japan, Germany pressings.
     - **Condition Breakdown**: Distribution of Mint vs VG+ vs VG records.
 
+#### 3.4. Shopping Mode
+* **Problem**: When shopping for new vinyl, shopper wants to confirm an potential acquisition is not already in their catalog
+* **Solution**:
+  -Multiple methods to make it wasy to look up an albim in their existing catalog. Provide methods to use all available scanning methods as well as manual entry of album name, artist and catalog number.
+  -Results show all matches with prices paid and year issued
+  -This should be implemented after Discogs catalog synch (feature 3.2) so it can use Discogs as the backend 
 ---
 
 ## 3. Implementation Status & Progress Tracker
@@ -134,7 +140,7 @@ flowchart TD
 | **Catalog Entry Editing & Pressing Upgrade** | Phase 1 | Completed | `backend/` + `CatalogScreen.kt` |
 | **Scanning Pause on Identification** | Phase 1 | Completed | `BarcodeAnalyzer.kt` & `ScannerViewModel.kt` |
 | **Vinyl Center Label Mode** | Phase 1 | Completed | `VinylLabelAnalyzer.kt` & `ScanOverlay.kt` |
-| **Manual Album Entry ('+' & No-Match)** | Phase 1 | Planned | Android `ManualAlbumScreen` + backend `POST` |
+| **Manual Album Entry ('+' & No-Match)** | Phase 1 | Completed | `ManualAlbumSheet.kt` + `CatalogScreen.kt` + `OcrCorrectionSheet.kt` |
 | **Duplicate Warning & Multi-Copy** | Phase 1 | Planned | `backend/` check + Android duplicate dialog |
 | **Batch Crate-Digging Queue** | Phase 1 | Planned | Android Room / SQLite queue + batch deck |
 | **Audio & Haptic Feedback** | Phase 1 | Planned | Android `Vibrator` & `SoundPool` |
@@ -143,3 +149,12 @@ flowchart TD
 | **Discogs Market Value Tracker** | Phase 3 | Planned | Discogs Marketplace API integration |
 | **Two-Way Discogs Sync & Export** | Phase 3 | Planned | Discogs Collection API & CSV exporter |
 | **Collection Insights Dashboard** | Phase 3 | Planned | Android Jetpack Compose Charts |
+| **Shopping Mode** | Phase 3 | Planned | TBD |
+
+## 4. Defects
+
+| Defect | Priority | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| **Scanner camera stays on while catalog lookup is happening. This wastes battery.** | High | **Resolved** | Dynamically unbinds physical camera sensor (`cameraProvider.unbindAll()`) during lookups, failed scans, and dialogs. Tap anywhere on viewfinder, tap "Scan Again", or dismiss to turn camera back on. |
+| **Vinyl label scanner is capturing info and performing a catalog look up before it is centered on the label resulting in frequent, highly erroneous scans** | Critical | **Resolved** | Enforced circular reticle boundary filtering, spindle centroid & vertical spread checks, 650ms stability dwell timer, real-time progress arc, and manual capture shutter button. |
+

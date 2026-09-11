@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -28,6 +30,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
@@ -35,6 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -79,6 +83,7 @@ fun CatalogScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedAlbumForDetails by remember { mutableStateOf<Album?>(null) }
     var albumToEdit by remember { mutableStateOf<Album?>(null) }
+    var isManualEntryOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(statusMessage) {
         statusMessage?.let { msg ->
@@ -236,6 +241,38 @@ fun CatalogScreen(
                     viewModel.fetchDiscogsPressings(art, tit, cat, bar)
                 }
             )
+        }
+
+        // Floating Action Button: Add Album Manually ('+' FAB)
+        FloatingActionButton(
+            onClick = { isManualEntryOpen = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 20.dp, end = 20.dp),
+            containerColor = VinylGold,
+            contentColor = Color.Black,
+            shape = CircleShape
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Add Album Manually", modifier = Modifier.size(28.dp))
+        }
+
+        // Manual Album Entry Modal Bottom Sheet
+        if (isManualEntryOpen) {
+            val manualSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { isManualEntryOpen = false },
+                sheetState = manualSheetState,
+                containerColor = VinylBlack
+            ) {
+                ManualAlbumSheet(
+                    onSaveAlbum = { manualAlbum ->
+                        viewModel.addConfirmedAlbum(manualAlbum) {
+                            isManualEntryOpen = false
+                        }
+                    },
+                    onDismiss = { isManualEntryOpen = false }
+                )
+            }
         }
 
         SnackbarHost(
