@@ -66,10 +66,9 @@ Always check [`ROADMAP.md`](file:///home/andre/developer/album_catalog/ROADMAP.m
   4. Vinyl Center Label Mode (circular reticle, spindle centroid checks, 650ms dwell timer, manual shutter).
   5. Manual Album Entry (floating `+` FAB on collection screen + fallback on No-Match screen).
   6. Duplicate Warning & Multi-Copy Handling (`catalog_checker.py`, `StagedAlbumConfirmationCard.kt`, `Top3MatchCards.kt`).
+  7. Audio & Haptic Sensory Feedback (`FeedbackManager.kt`, `ScannerViewModel.kt`, `SettingsScreen.kt`).
 - **Remaining / To Be Implemented**:
-  1. **Audio & Haptic Sensory Feedback**:
-     - Vibration click on barcode/label lock, audio chime on successful match, double-tap vibration on miss.
-  2. **Batch "Crate-Digging" Mode**:
+  1. **Batch "Crate-Digging" Mode**:
      - Scanner batch toggle, offline queue in Room/SQLite, live queue count badge, swipeable Batch Review Deck.
 
 ---

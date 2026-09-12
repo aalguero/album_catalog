@@ -143,7 +143,7 @@ flowchart TD
 | **Manual Album Entry ('+' & No-Match)** | Phase 1 | Completed | `ManualAlbumSheet.kt` + `CatalogScreen.kt` + `OcrCorrectionSheet.kt` |
 | **Duplicate Warning & Multi-Copy** | Phase 1 | Completed | `backend/app/services/catalog_checker.py` + `StagedAlbumConfirmationCard.kt` |
 | **Batch Crate-Digging Queue** | Phase 1 | Planned | Android Room / SQLite queue + batch deck |
-| **Audio & Haptic Feedback** | Phase 1 | Planned | Android `Vibrator` & `SoundPool` |
+| **Audio & Haptic Feedback** | Phase 1 | Completed | `FeedbackManager.kt` & `SettingsScreen.kt` |
 | **Runout Dead Wax Matrix OCR** | Phase 2 | Planned | ML Kit / OpenCV contrast pipeline |
 | **Cover Art Visual Match** | Phase 2 | Planned | Image embedding matcher |
 | **Discogs Market Value Tracker** | Phase 3 | Planned | Discogs Marketplace API integration |

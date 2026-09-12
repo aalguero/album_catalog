@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.albumcatalog.app.util.FeedbackManager
 
 sealed class MatchUiState {
     object Idle : MatchUiState()
@@ -50,7 +51,8 @@ sealed class DiscogsUiState {
 }
 
 class ScannerViewModel(
-    private val repository: VinylRepository = VinylRepository()
+    private val repository: VinylRepository = VinylRepository(),
+    private val feedbackManager: FeedbackManager = FeedbackManager()
 ) : ViewModel() {
 
     private val _scanMode = MutableStateFlow(ScanMode.BARCODE)
@@ -155,6 +157,7 @@ class ScannerViewModel(
             )
             result.onSuccess { response ->
                 if (response.candidates.isNotEmpty()) {
+                    feedbackManager.onMatchSuccess()
                     _matchState.value = MatchUiState.MatchesFound(
                         candidates = response.candidates,
                         sourceUsed = response.sourceUsed,
@@ -162,6 +165,7 @@ class ScannerViewModel(
                         detectedCatno = catno
                     )
                 } else {
+                    feedbackManager.onMatchMiss()
                     val summaryList = listOfNotNull(
                         if (catno.isNotBlank()) "Cat#: $catno" else null,
                         if (artist.isNotBlank()) "Artist: $artist" else null,
@@ -177,6 +181,7 @@ class ScannerViewModel(
                     )
                 }
             }.onFailure { error ->
+                feedbackManager.onMatchMiss()
                 _matchState.value = MatchUiState.Error(error.localizedMessage ?: "Search failed")
             }
         }
@@ -208,18 +213,21 @@ class ScannerViewModel(
     fun onBarcodeDetected(barcode: String) {
         if (!_isScanningActive.value) return
         _isScanningActive.value = false
+        feedbackManager.onScanLocked()
         _matchState.value = MatchUiState.Matching
 
         viewModelScope.launch {
             val result = repository.scanBarcode(barcode)
             result.onSuccess { response ->
                 if (response.candidates.isNotEmpty()) {
+                    feedbackManager.onMatchSuccess()
                     _matchState.value = MatchUiState.MatchesFound(
                         candidates = response.candidates,
                         sourceUsed = response.sourceUsed,
                         rawScannedValue = barcode
                     )
                 } else {
+                    feedbackManager.onMatchMiss()
                     _matchState.value = MatchUiState.NoMatch(
                         queryType = "Barcode (UPC/EAN)",
                         scannedValue = barcode,
@@ -227,6 +235,7 @@ class ScannerViewModel(
                     )
                 }
             }.onFailure { error ->
+                feedbackManager.onMatchMiss()
                 _matchState.value = MatchUiState.Error(error.localizedMessage ?: "Failed to match barcode")
             }
         }
@@ -235,12 +244,14 @@ class ScannerViewModel(
     fun onLabelDetected(fullText: String, catno: String?) {
         if (!_isScanningActive.value) return
         _isScanningActive.value = false
+        feedbackManager.onScanLocked()
         _matchState.value = MatchUiState.Matching
 
         viewModelScope.launch {
             val result = repository.scanVinylLabel(fullText, catno)
             result.onSuccess { response ->
                 if (response.candidates.isNotEmpty()) {
+                    feedbackManager.onMatchSuccess()
                     _matchState.value = MatchUiState.MatchesFound(
                         candidates = response.candidates,
                         sourceUsed = response.sourceUsed,
@@ -248,6 +259,7 @@ class ScannerViewModel(
                         detectedCatno = catno
                     )
                 } else {
+                    feedbackManager.onMatchMiss()
                     _matchState.value = MatchUiState.NoMatch(
                         queryType = "Vinyl Center Label OCR",
                         scannedValue = fullText,
@@ -256,6 +268,7 @@ class ScannerViewModel(
                     )
                 }
             }.onFailure { error ->
+                feedbackManager.onMatchMiss()
                 _matchState.value = MatchUiState.Error(error.localizedMessage ?: "Failed to match label text")
             }
         }
@@ -270,11 +283,13 @@ class ScannerViewModel(
             val result = repository.manualSearch(query)
             result.onSuccess { response ->
                 if (response.candidates.isNotEmpty()) {
+                    feedbackManager.onMatchSuccess()
                     _matchState.value = MatchUiState.MatchesFound(
                         candidates = response.candidates,
                         sourceUsed = response.sourceUsed
                     )
                 } else {
+                    feedbackManager.onMatchMiss()
                     _matchState.value = MatchUiState.NoMatch(
                         queryType = "Manual Search Query",
                         scannedValue = query,
@@ -282,6 +297,7 @@ class ScannerViewModel(
                     )
                 }
             }.onFailure { error ->
+                feedbackManager.onMatchMiss()
                 _matchState.value = MatchUiState.Error(error.localizedMessage ?: "Search failed")
             }
         }
@@ -352,5 +368,10 @@ class ScannerViewModel(
         _isScanningActive.value = true
         stagedCandidate = null
         stagedPressing = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        feedbackManager.release()
     }
 }
