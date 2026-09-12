@@ -226,6 +226,9 @@ fun StagedAlbumConfirmationCard(
                                         mediaCondition = mediaCondition,
                                         sleeveCondition = sleeveCondition,
                                         purchasePrice = purchasePrice.toDoubleOrNull() ?: primaryExisting.purchasePrice,
+                                        shelfLocation = primaryExisting.shelfLocation,
+                                        purchaseDate = primaryExisting.purchaseDate,
+                                        purchaseStore = primaryExisting.purchaseStore,
                                         notes = notes.ifEmpty { primaryExisting.notes }
                                     )
                                     onUpdateExisting(primaryExisting.id, finalized)

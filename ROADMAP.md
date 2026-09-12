@@ -157,4 +157,5 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | **Scanner camera stays on while catalog lookup is happening. This wastes battery.** | High | **Resolved** | Dynamically unbinds physical camera sensor (`cameraProvider.unbindAll()`) during lookups, failed scans, and dialogs. Tap anywhere on viewfinder, tap "Scan Again", or dismiss to turn camera back on. |
 | **Vinyl label scanner is capturing info and performing a catalog look up before it is centered on the label resulting in frequent, highly erroneous scans** | Critical | **Resolved** | Enforced circular reticle boundary filtering, spindle centroid & vertical spread checks, 650ms stability dwell timer, real-time progress arc, and manual capture shutter button. |
+| **When a catalog search yields one result, when you try to refine it, it says there are no alternate versions and it gets marked as unspecific** | High | Open | It should be considered a specific entry and not even prompt the user with an option to refine it |
 

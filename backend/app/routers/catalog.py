@@ -145,6 +145,7 @@ async def update_album(
         raise HTTPException(status_code=404, detail="Album not found")
 
     update_data = album_update.model_dump(exclude_unset=True)
+    tracks_to_update = update_data.pop("tracks", None)
     fields = []
     args = []
     
@@ -154,6 +155,9 @@ async def update_album(
                 value = uuid.UUID(str(value))
             except ValueError:
                 value = None
+        # Don't overwrite existing non-null fields with None if doing partial update
+        if value is None and existing.get(field_name) is not None:
+            continue
         args.append(value)
         fields.append(f"{field_name} = ${len(args)}")
     
@@ -174,6 +178,17 @@ async def update_album(
     if album_dict.get("musicbrainz_release_id"):
         album_dict["musicbrainz_release_id"] = str(album_dict["musicbrainz_release_id"])
         
+    # If tracks provided and album doesn't have tracks, insert them
+    if tracks_to_update:
+        existing_track_count = await conn.fetchval("SELECT count(*) FROM tracks WHERE album_id = $1;", album_id)
+        if existing_track_count == 0:
+            track_query = """
+            INSERT INTO tracks (album_id, position, title, duration, is_favorite)
+            VALUES ($1, $2, $3, $4, $5);
+            """
+            for t in tracks_to_update:
+                await conn.execute(track_query, album_id, t.position, t.title, t.duration, t.is_favorite)
+
     track_rows = await conn.fetch(
         "SELECT position, title, duration, is_favorite FROM tracks WHERE album_id = $1 ORDER BY id;",
         album_id

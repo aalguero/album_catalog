@@ -58,6 +58,7 @@ class AlbumUpdate(BaseModel):
     notes: Optional[str] = None
     favorite_tracks: Optional[List[str]] = None
     tags: Optional[List[str]] = None
+    tracks: Optional[List[TrackItem]] = None
 
 class AlbumResponse(AlbumCreate):
     id: int

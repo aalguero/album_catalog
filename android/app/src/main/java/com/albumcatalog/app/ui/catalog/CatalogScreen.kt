@@ -3,6 +3,8 @@ package com.albumcatalog.app.ui.catalog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -118,111 +120,118 @@ fun CatalogScreen(
 
             // 1. Staged Album Confirmation Card (from scanning)
             if (stagedAlbum != null) {
-                StagedAlbumConfirmationCard(
-                    album = stagedAlbum,
-                    duplicateInfo = duplicateState,
-                    onConfirm = { confirmedAlbum ->
-                        viewModel.addConfirmedAlbum(confirmedAlbum) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = 32.dp)
+                ) {
+                    StagedAlbumConfirmationCard(
+                        album = stagedAlbum,
+                        duplicateInfo = duplicateState,
+                        onConfirm = { confirmedAlbum ->
+                            viewModel.addConfirmedAlbum(confirmedAlbum) {
+                                viewModel.clearDuplicateState()
+                                onConfirmStagedAlbum()
+                            }
+                        },
+                        onUpdateExisting = { existingId, updatedAlbum ->
+                            viewModel.updateAlbum(existingId, updatedAlbum) {
+                                viewModel.clearDuplicateState()
+                                onConfirmStagedAlbum()
+                            }
+                        },
+                        onReject = {
                             viewModel.clearDuplicateState()
-                            onConfirmStagedAlbum()
-                        }
-                    },
-                    onUpdateExisting = { existingId, updatedAlbum ->
-                        viewModel.updateAlbum(existingId, updatedAlbum) {
-                            viewModel.clearDuplicateState()
-                            onConfirmStagedAlbum()
-                        }
-                    },
-                    onReject = {
-                        viewModel.clearDuplicateState()
-                        onRejectStagedAlbum()
-                    },
-                    modifier = Modifier.padding(bottom = 14.dp)
-                )
-            }
-
-            // 2. Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { viewModel.onSearchQueryChanged(it) },
-                placeholder = { Text("Filter collection by artist, title, or label...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = VinylGold) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 3. Filter chips (All / Specific / Unspecific)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = pressingFilter == null,
-                    onClick = { viewModel.setPressingFilter(null) },
-                    label = { Text("All") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = VinylGold,
-                        selectedLabelColor = Color.Black
+                            onRejectStagedAlbum()
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
-                )
-                FilterChip(
-                    selected = pressingFilter == "specific",
-                    onClick = { viewModel.setPressingFilter("specific") },
-                    label = { Text("Specific Pressings") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = VinylGreen,
-                        selectedLabelColor = Color.Black
-                    )
-                )
-                FilterChip(
-                    selected = pressingFilter == "unspecific",
-                    onClick = { viewModel.setPressingFilter("unspecific") },
-                    label = { Text("Unspecific") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFF9E9E9E),
-                        selectedLabelColor = Color.Black
-                    )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // 4. Collection List
-            when (val state = uiState) {
-                is CatalogUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = VinylGold)
-                    }
                 }
-                is CatalogUiState.Error -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(text = state.message, color = Color(0xFFEF5350), fontSize = 14.sp)
-                    }
+            } else {
+                // 2. Search bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.onSearchQueryChanged(it) },
+                    placeholder = { Text("Filter collection by artist, title, or label...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = VinylGold) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 3. Filter chips (All / Specific / Unspecific)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = pressingFilter == null,
+                        onClick = { viewModel.setPressingFilter(null) },
+                        label = { Text("All") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = VinylGold,
+                            selectedLabelColor = Color.Black
+                        )
+                    )
+                    FilterChip(
+                        selected = pressingFilter == "specific",
+                        onClick = { viewModel.setPressingFilter("specific") },
+                        label = { Text("Specific Pressings") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = VinylGreen,
+                            selectedLabelColor = Color.Black
+                        )
+                    )
+                    FilterChip(
+                        selected = pressingFilter == "unspecific",
+                        onClick = { viewModel.setPressingFilter("unspecific") },
+                        label = { Text("Unspecific") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFF9E9E9E),
+                            selectedLabelColor = Color.Black
+                        )
+                    )
                 }
-                is CatalogUiState.Success -> {
-                    if (state.albums.isEmpty()) {
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 4. Collection List
+                when (val state = uiState) {
+                    is CatalogUiState.Loading -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "No albums in collection yet.\nUse the Scan tab to catalog your first record!",
-                                color = TextSecondary,
-                                fontSize = 14.sp,
-                                lineHeight = 20.sp
-                            )
+                            CircularProgressIndicator(color = VinylGold)
                         }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            items(state.albums) { album ->
-                                AlbumCatalogItem(
-                                    album = album,
-                                    onClick = { selectedAlbumForDetails = album },
-                                    onEdit = { albumToEdit = album },
-                                    onDelete = { album.id?.let { viewModel.deleteAlbum(it) } }
+                    }
+                    is CatalogUiState.Error -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(text = state.message, color = Color(0xFFEF5350), fontSize = 14.sp)
+                        }
+                    }
+                    is CatalogUiState.Success -> {
+                        if (state.albums.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "No albums in collection yet.\nUse the Scan tab to catalog your first record!",
+                                    color = TextSecondary,
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp
                                 )
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(state.albums) { album ->
+                                    AlbumCatalogItem(
+                                        album = album,
+                                        onClick = { selectedAlbumForDetails = album },
+                                        onEdit = { albumToEdit = album },
+                                        onDelete = { album.id?.let { viewModel.deleteAlbum(it) } }
+                                    )
+                                }
                             }
                         }
                     }
