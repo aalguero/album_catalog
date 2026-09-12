@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -42,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.albumcatalog.app.data.model.Album
+import com.albumcatalog.app.data.model.DuplicateCheckResponse
 import com.albumcatalog.app.ui.components.ConditionGradeSelector
 import com.albumcatalog.app.ui.theme.TextPrimary
 import com.albumcatalog.app.ui.theme.TextSecondary
@@ -54,7 +58,9 @@ import com.albumcatalog.app.ui.theme.VinylGreen
 @Composable
 fun StagedAlbumConfirmationCard(
     album: Album,
+    duplicateInfo: DuplicateCheckResponse? = null,
     onConfirm: (Album) -> Unit,
+    onUpdateExisting: ((Int, Album) -> Unit)? = null,
     onReject: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -63,12 +69,20 @@ fun StagedAlbumConfirmationCard(
     var purchasePrice by remember { mutableStateOf(album.purchasePrice?.toString() ?: "") }
     var notes by remember { mutableStateOf(album.notes ?: "") }
 
+    val isDuplicate = duplicateInfo?.isDuplicate == true
+    val existingAlbums = duplicateInfo?.existingAlbums ?: emptyList()
+    val primaryExisting = existingAlbums.firstOrNull()
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(VinylCard)
-            .border(2.dp, VinylGold, RoundedCornerShape(16.dp))
+            .border(
+                width = 2.dp,
+                color = if (isDuplicate) Color(0xFFFF9800) else VinylGold,
+                shape = RoundedCornerShape(16.dp)
+            )
             .padding(16.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -78,8 +92,8 @@ fun StagedAlbumConfirmationCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Confirm Scanned Album",
-                    color = VinylGold,
+                    text = if (isDuplicate) "Duplicate Album Detected" else "Confirm Scanned Album",
+                    color = if (isDuplicate) Color(0xFFFFB74D) else VinylGold,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -134,6 +148,14 @@ fun StagedAlbumConfirmationCard(
                 }
             }
 
+            // Non-blocking Duplicate Alert Banner
+            if (isDuplicate && primaryExisting != null) {
+                DuplicateAlertBanner(
+                    duplicateInfo = duplicateInfo,
+                    primaryExisting = primaryExisting
+                )
+            }
+
             // Condition Selectors
             ConditionGradeSelector(
                 label = "Media",
@@ -147,7 +169,7 @@ fun StagedAlbumConfirmationCard(
                 onGradeSelected = { sleeveCondition = it }
             )
 
-            // Price Paid (Prominent & always asked when cataloging)
+            // Price Paid
             OutlinedTextField(
                 value = purchasePrice,
                 onValueChange = { purchasePrice = it },
@@ -168,39 +190,165 @@ fun StagedAlbumConfirmationCard(
             )
 
             // Confirmation Actions
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Button(
-                    onClick = {
-                        val finalized = album.copy(
-                            mediaCondition = mediaCondition,
-                            sleeveCondition = sleeveCondition,
-                            purchasePrice = purchasePrice.toDoubleOrNull(),
-                            notes = notes.ifEmpty { null }
-                        )
-                        onConfirm(finalized)
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = VinylGold, contentColor = Color.Black),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Confirm & Add", fontWeight = FontWeight.Bold)
-                }
+            if (isDuplicate && primaryExisting != null) {
+                val copyNumber = existingAlbums.size + 1
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Action 1: Add as Second / New Copy
+                    Button(
+                        onClick = {
+                            val finalized = album.copy(
+                                mediaCondition = mediaCondition,
+                                sleeveCondition = sleeveCondition,
+                                purchasePrice = purchasePrice.toDoubleOrNull(),
+                                notes = notes.ifEmpty { null }
+                            )
+                            onConfirm(finalized)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = VinylGold, contentColor = Color.Black),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Add as Copy #$copyNumber", fontWeight = FontWeight.Bold)
+                    }
 
-                OutlinedButton(
-                    onClick = onReject,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF5350))
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Reject & Scan", fontWeight = FontWeight.SemiBold)
+                    // Actions 2 & 3: Update Existing Copy vs Skip/Discard
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (onUpdateExisting != null && primaryExisting.id != null) {
+                            OutlinedButton(
+                                onClick = {
+                                    val finalized = album.copy(
+                                        id = primaryExisting.id,
+                                        mediaCondition = mediaCondition,
+                                        sleeveCondition = sleeveCondition,
+                                        purchasePrice = purchasePrice.toDoubleOrNull() ?: primaryExisting.purchasePrice,
+                                        notes = notes.ifEmpty { primaryExisting.notes }
+                                    )
+                                    onUpdateExisting(primaryExisting.id, finalized)
+                                },
+                                modifier = Modifier.weight(1.1f),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF81D4FA)),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0288D1))
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Update Existing Copy", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = onReject,
+                            modifier = Modifier.weight(0.9f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF5350)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF5350))
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Skip / Discard", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                        }
+                    }
                 }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val finalized = album.copy(
+                                mediaCondition = mediaCondition,
+                                sleeveCondition = sleeveCondition,
+                                purchasePrice = purchasePrice.toDoubleOrNull(),
+                                notes = notes.ifEmpty { null }
+                            )
+                            onConfirm(finalized)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = VinylGold, contentColor = Color.Black),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Confirm & Add", fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = onReject,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF5350))
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Reject & Scan", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DuplicateAlertBanner(
+    duplicateInfo: DuplicateCheckResponse,
+    primaryExisting: Album,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFE65100).copy(alpha = 0.2f))
+            .border(1.dp, Color(0xFFFF9800), RoundedCornerShape(10.dp))
+            .padding(10.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Duplicate Warning",
+                    tint = Color(0xFFFFB74D),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (duplicateInfo.existingAlbums.size > 1) {
+                        "You already own ${duplicateInfo.existingAlbums.size} copies of this album"
+                    } else {
+                        "You already own a copy of this album"
+                    },
+                    color = Color(0xFFFFB74D),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            val details = listOfNotNull(
+                primaryExisting.shelfLocation?.let { "Shelf: $it" },
+                primaryExisting.mediaCondition?.let { "Condition: $it" },
+                primaryExisting.purchasePrice?.let { "Paid: $$it" },
+                primaryExisting.createdAt?.take(10)?.let { "Added: $it" }
+            )
+            if (details.isNotEmpty()) {
+                Text(
+                    text = "Existing: ${details.joinToString(" • ")}",
+                    color = Color(0xFFFFE0B2),
+                    fontSize = 12.sp
+                )
+            }
+
+            if (!duplicateInfo.matchReason.isNullOrBlank()) {
+                Text(
+                    text = duplicateInfo.matchReason,
+                    color = Color(0xFFB0BEC5),
+                    fontSize = 11.sp
+                )
             }
         }
     }

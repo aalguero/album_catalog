@@ -151,6 +151,33 @@ fun MatchCandidateCard(
                         )
                     }
 
+                    if (candidate.inCollection) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .background(Color(0xFFE65100).copy(alpha = 0.25f), RoundedCornerShape(4.dp))
+                                .border(1.dp, Color(0xFFFF9800), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "IN COLLECTION",
+                                color = Color(0xFFFFB74D),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (!candidate.existingCopyInfo.isNullOrEmpty()) {
+                                Text(
+                                    text = " • ${candidate.existingCopyInfo}",
+                                    color = Color(0xFFFFE0B2),
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(

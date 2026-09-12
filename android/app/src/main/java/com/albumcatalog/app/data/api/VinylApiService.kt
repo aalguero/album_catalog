@@ -29,6 +29,9 @@ interface VinylApiService {
     @POST("api/catalog/albums")
     suspend fun addAlbum(@Body album: Album): Album
 
+    @POST("api/catalog/check-duplicate")
+    suspend fun checkDuplicate(@Body req: com.albumcatalog.app.data.model.DuplicateCheckRequest): com.albumcatalog.app.data.model.DuplicateCheckResponse
+
     @GET("api/catalog/albums")
     suspend fun listAlbums(
         @Query("q") query: String? = null,

@@ -5,8 +5,9 @@ import json
 import uuid
 
 from app.db import get_catalog_conn
-from app.models.catalog import AlbumCreate, AlbumUpdate, AlbumResponse
+from app.models.catalog import AlbumCreate, AlbumUpdate, AlbumResponse, DuplicateCheckRequest, DuplicateCheckResponse
 from app.models.matcher import TrackItem
+from app.services.catalog_checker import find_existing_albums
 
 router = APIRouter(prefix="/api/catalog", tags=["Catalog"])
 
@@ -186,3 +187,41 @@ async def delete_album(album_id: int, conn: asyncpg.Connection = Depends(get_cat
     if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Album not found")
     return {"message": "Album deleted successfully"}
+
+@router.post("/check-duplicate", response_model=DuplicateCheckResponse)
+async def check_duplicate(
+    req: DuplicateCheckRequest,
+    conn: asyncpg.Connection = Depends(get_catalog_conn)
+):
+    rows, reason = await find_existing_albums(
+        conn=conn,
+        barcode=req.barcode,
+        catalog_number=req.catalog_number,
+        artist=req.artist,
+        title=req.title,
+        discogs_release_id=req.discogs_release_id,
+        musicbrainz_release_id=req.musicbrainz_release_id
+    )
+
+    if not rows:
+        return DuplicateCheckResponse(is_duplicate=False, existing_albums=[])
+
+    album_responses = []
+    for r in rows:
+        album_dict = dict(r)
+        if album_dict.get("musicbrainz_release_id"):
+            album_dict["musicbrainz_release_id"] = str(album_dict["musicbrainz_release_id"])
+        
+        track_rows = await conn.fetch(
+            "SELECT position, title, duration, is_favorite FROM tracks WHERE album_id = $1 ORDER BY id;",
+            r["id"]
+        )
+        album_dict["tracks"] = [TrackItem(**dict(tr)) for tr in track_rows]
+        album_responses.append(AlbumResponse(**album_dict))
+
+    return DuplicateCheckResponse(
+        is_duplicate=True,
+        match_reason=reason,
+        existing_albums=album_responses
+    )
+

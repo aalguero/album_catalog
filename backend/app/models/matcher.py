@@ -32,6 +32,8 @@ class MatchCandidate(BaseModel):
     source: str = "local_musicbrainz"  # local_musicbrainz, remote_musicbrainz, discogs
     confidence_score: int = 100  # 0 to 100
     match_reason: str = "Exact barcode match"
+    in_collection: bool = False
+    existing_copy_info: Optional[str] = None
 
 class ScanResponse(BaseModel):
     query_type: str

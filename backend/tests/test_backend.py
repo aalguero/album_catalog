@@ -73,9 +73,45 @@ async def run_tests():
             resp = await client.get("/api/catalog/albums")
             catalog_list = resp.json()
             print(f"    Catalog currently has {len(catalog_list)} albums:")
-            for a in catalog_list:
+            for a in catalog_list[:5]:
                 print(f"      - ID {a['id']}: {a['artist']} - {a['title']} [{a['pressing_status']}] (Condition: {a['media_condition']})")
             assert len(catalog_list) > 0
+
+            # 5. Test Duplicate Detection Endpoint (POST /api/catalog/check-duplicate)
+            print("\n[5] Testing Duplicate Detection Endpoint:")
+            dup_resp = await client.post("/api/catalog/check-duplicate", json={"barcode": test_barcode})
+            assert dup_resp.status_code == 200
+            dup_data = dup_resp.json()
+            print(f"    Duplicate Check (Barcode): is_duplicate={dup_data['is_duplicate']}, reason='{dup_data['match_reason']}'")
+            print(f"    Found {len(dup_data['existing_albums'])} existing copies.")
+            assert dup_data["is_duplicate"] is True
+            assert len(dup_data["existing_albums"]) >= 1
+
+            # Test duplicate check by Artist & Title
+            dup_resp_artist = await client.post("/api/catalog/check-duplicate", json={
+                "artist": "Igorrr",
+                "title": "Spirituality and Distortion"
+            })
+            assert dup_resp_artist.status_code == 200
+            dup_artist_data = dup_resp_artist.json()
+            print(f"    Duplicate Check (Artist/Title): is_duplicate={dup_artist_data['is_duplicate']}, reason='{dup_artist_data['match_reason']}'")
+            assert dup_artist_data["is_duplicate"] is True
+
+            # Test duplicate check for non-existing album
+            non_dup_resp = await client.post("/api/catalog/check-duplicate", json={"barcode": "999999999999"})
+            assert non_dup_resp.status_code == 200
+            assert non_dup_resp.json()["is_duplicate"] is False
+            print("    Duplicate Check (Non-existing): correctly returned is_duplicate=False")
+
+            # 6. Test Candidate Collection Enrichment in Scanner
+            print("\n[6] Testing Candidate Duplicate Enrichment in /api/match/scan:")
+            scan_recheck = await client.post("/api/match/scan", json={"barcode": test_barcode})
+            assert scan_recheck.status_code == 200
+            recheck_data = scan_recheck.json()
+            top_candidate = recheck_data["candidates"][0]
+            print(f"    Top Candidate: in_collection={top_candidate.get('in_collection')}, info='{top_candidate.get('existing_copy_info')}'")
+            assert top_candidate.get("in_collection") is True
+            assert top_candidate.get("existing_copy_info") is not None
 
         print("\n=== ALL INTEGRATION TESTS PASSED SUCCESSFULLY! ===")
     finally:

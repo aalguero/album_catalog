@@ -34,7 +34,9 @@ data class MatchCandidate(
     val tracks: List<TrackItem> = emptyList(),
     val source: String = "local_musicbrainz",
     @SerializedName("confidence_score") val confidenceScore: Int = 100,
-    @SerializedName("match_reason") val matchReason: String = "Exact match"
+    @SerializedName("match_reason") val matchReason: String = "Exact match",
+    @SerializedName("in_collection") val inCollection: Boolean = false,
+    @SerializedName("existing_copy_info") val existingCopyInfo: String? = null
 )
 
 data class ScanResponse(
@@ -93,4 +95,19 @@ data class Album(
 data class DeleteResponse(
     val status: String,
     val id: Int
+)
+
+data class DuplicateCheckRequest(
+    val barcode: String? = null,
+    @SerializedName("catalog_number") val catalogNumber: String? = null,
+    val artist: String? = null,
+    val title: String? = null,
+    @SerializedName("discogs_release_id") val discogsReleaseId: Long? = null,
+    @SerializedName("musicbrainz_release_id") val musicbrainzReleaseId: String? = null
+)
+
+data class DuplicateCheckResponse(
+    @SerializedName("is_duplicate") val isDuplicate: Boolean = false,
+    @SerializedName("match_reason") val matchReason: String? = null,
+    @SerializedName("existing_albums") val existingAlbums: List<Album> = emptyList()
 )

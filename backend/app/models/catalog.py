@@ -63,3 +63,17 @@ class AlbumResponse(AlbumCreate):
     id: int
     created_at: datetime
     updated_at: datetime
+
+class DuplicateCheckRequest(BaseModel):
+    barcode: Optional[str] = None
+    catalog_number: Optional[str] = None
+    artist: Optional[str] = None
+    title: Optional[str] = None
+    discogs_release_id: Optional[int] = None
+    musicbrainz_release_id: Optional[str] = None
+
+class DuplicateCheckResponse(BaseModel):
+    is_duplicate: bool
+    match_reason: Optional[str] = None
+    existing_albums: List[AlbumResponse] = Field(default_factory=list)
+

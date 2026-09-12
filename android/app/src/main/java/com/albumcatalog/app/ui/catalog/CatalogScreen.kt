@@ -79,6 +79,7 @@ fun CatalogScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val pressingFilter by viewModel.pressingFilter.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
+    val duplicateState by viewModel.duplicateState.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedAlbumForDetails by remember { mutableStateOf<Album?>(null) }
@@ -89,6 +90,14 @@ fun CatalogScreen(
         statusMessage?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.clearStatusMessage()
+        }
+    }
+
+    LaunchedEffect(stagedAlbum) {
+        if (stagedAlbum != null) {
+            viewModel.checkDuplicate(stagedAlbum)
+        } else {
+            viewModel.clearDuplicateState()
         }
     }
 
@@ -111,10 +120,23 @@ fun CatalogScreen(
             if (stagedAlbum != null) {
                 StagedAlbumConfirmationCard(
                     album = stagedAlbum,
+                    duplicateInfo = duplicateState,
                     onConfirm = { confirmedAlbum ->
-                        viewModel.addConfirmedAlbum(confirmedAlbum, onConfirmStagedAlbum)
+                        viewModel.addConfirmedAlbum(confirmedAlbum) {
+                            viewModel.clearDuplicateState()
+                            onConfirmStagedAlbum()
+                        }
                     },
-                    onReject = onRejectStagedAlbum,
+                    onUpdateExisting = { existingId, updatedAlbum ->
+                        viewModel.updateAlbum(existingId, updatedAlbum) {
+                            viewModel.clearDuplicateState()
+                            onConfirmStagedAlbum()
+                        }
+                    },
+                    onReject = {
+                        viewModel.clearDuplicateState()
+                        onRejectStagedAlbum()
+                    },
                     modifier = Modifier.padding(bottom = 14.dp)
                 )
             }

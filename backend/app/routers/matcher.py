@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 import asyncpg
 
-from app.db import get_musicbrainz_conn
+from app.db import get_musicbrainz_conn, get_catalog_conn
 from app.models.matcher import ScanRequest, ScanResponse, MatchCandidate, DiscogsPressingOption
 from app.services.musicbrainz_local import (
     search_by_barcode,
@@ -12,13 +12,15 @@ from app.services.musicbrainz_local import (
 from app.services.musicbrainz_remote import search_remote_musicbrainz
 from app.services.discogs_client import fetch_discogs_pressings, search_discogs_direct
 from app.services.ranker import extract_potential_catno, rank_and_select_top_candidates
+from app.services.catalog_checker import find_existing_albums
 
 router = APIRouter(prefix="/api/match", tags=["Matcher"])
 
 @router.post("/scan", response_model=ScanResponse)
 async def scan_metadata(
     req: ScanRequest,
-    conn: asyncpg.Connection = Depends(get_musicbrainz_conn)
+    conn: asyncpg.Connection = Depends(get_musicbrainz_conn),
+    catalog_conn: asyncpg.Connection = Depends(get_catalog_conn)
 ):
     candidates: List[MatchCandidate] = []
     source_used = "none"
@@ -115,6 +117,30 @@ async def scan_metadata(
         query_text=req.spine_text or (f"{req.artist or ''} {req.title or ''}".strip()),
         limit=3
     )
+
+    # Check collection for duplicates
+    for cand in top3:
+        existing_rows, _ = await find_existing_albums(
+            conn=catalog_conn,
+            barcode=cand.barcode,
+            catalog_number=cand.catalog_number,
+            artist=cand.artist,
+            title=cand.title,
+            discogs_release_id=cand.discogs_release_id,
+            musicbrainz_release_id=cand.musicbrainz_release_id
+        )
+        if existing_rows:
+            cand.in_collection = True
+            first_copy = existing_rows[0]
+            cond = first_copy.get("media_condition") or "VG+"
+            shelf = first_copy.get("shelf_location")
+            price = first_copy.get("purchase_price")
+            details = [f"Cond: {cond}"]
+            if shelf:
+                details.append(f"Shelf: {shelf}")
+            if price:
+                details.append(f"${price:.2f}")
+            cand.existing_copy_info = " • ".join(details)
 
     return ScanResponse(
         query_type=query_type,

@@ -98,6 +98,30 @@ class VinylRepository {
         }
     }
 
+    suspend fun checkDuplicate(
+        barcode: String? = null,
+        catno: String? = null,
+        artist: String? = null,
+        title: String? = null,
+        discogsId: Long? = null,
+        mbId: String? = null
+    ): Result<com.albumcatalog.app.data.model.DuplicateCheckResponse> = withContext(Dispatchers.IO) {
+        try {
+            val req = com.albumcatalog.app.data.model.DuplicateCheckRequest(
+                barcode = barcode?.trim()?.ifEmpty { null },
+                catalogNumber = catno?.trim()?.ifEmpty { null },
+                artist = artist?.trim()?.ifEmpty { null },
+                title = title?.trim()?.ifEmpty { null },
+                discogsReleaseId = discogsId,
+                musicbrainzReleaseId = mbId
+            )
+            val res = api.checkDuplicate(req)
+            Result.success(res)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun getAlbums(
         query: String? = null,
         pressingStatus: String? = null,

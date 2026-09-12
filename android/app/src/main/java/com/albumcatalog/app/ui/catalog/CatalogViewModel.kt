@@ -32,8 +32,33 @@ class CatalogViewModel(
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
 
+    private val _duplicateState = MutableStateFlow<com.albumcatalog.app.data.model.DuplicateCheckResponse?>(null)
+    val duplicateState: StateFlow<com.albumcatalog.app.data.model.DuplicateCheckResponse?> = _duplicateState.asStateFlow()
+
     init {
         loadAlbums()
+    }
+
+    fun checkDuplicate(album: Album) {
+        viewModelScope.launch {
+            val result = repository.checkDuplicate(
+                barcode = album.barcode,
+                catno = album.catalogNumber,
+                artist = album.artist,
+                title = album.title,
+                discogsId = album.discogsReleaseId,
+                mbId = album.musicbrainzReleaseId
+            )
+            result.onSuccess { resp ->
+                _duplicateState.value = resp
+            }.onFailure {
+                _duplicateState.value = null
+            }
+        }
+    }
+
+    fun clearDuplicateState() {
+        _duplicateState.value = null
     }
 
     fun loadAlbums() {
