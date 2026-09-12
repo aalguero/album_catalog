@@ -11,6 +11,7 @@ import com.google.mlkit.vision.common.InputImage
 
 class BarcodeAnalyzer(
     private val isScanningEnabled: () -> Boolean,
+    private val isContinuousMode: () -> Boolean = { false },
     private val onBarcodeDetected: (String) -> Unit
 ) : ImageAnalysis.Analyzer {
 
@@ -32,10 +33,17 @@ class BarcodeAnalyzer(
     @Volatile
     private var isTriggered = false
 
+    fun resetTrigger() {
+        isTriggered = false
+        lastScannedCode = null
+        lastScannedTimestamp = 0L
+    }
+
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        // Immediately drop frames if scanning is paused/disabled or already triggered
-        if (!isScanningEnabled() || isTriggered) {
+        val continuous = isContinuousMode()
+        // Immediately drop frames if scanning is disabled, or if single-mode has already triggered
+        if (!isScanningEnabled() || (!continuous && isTriggered)) {
             imageProxy.close()
             return
         }
@@ -45,18 +53,29 @@ class BarcodeAnalyzer(
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
             scanner.process(image)
                 .addOnSuccessListener { barcodes ->
-                    if (!isScanningEnabled() || isTriggered) return@addOnSuccessListener
+                    if (!isScanningEnabled() || (!continuous && isTriggered)) return@addOnSuccessListener
                     for (barcode in barcodes) {
                         barcode.rawValue?.let { rawCode ->
                             val code = rawCode.trim()
                             val now = System.currentTimeMillis()
-                            // Debounce duplicate scans within 2.5 seconds
-                            if (code != lastScannedCode || now - lastScannedTimestamp > 2500L) {
-                                lastScannedCode = code
-                                lastScannedTimestamp = now
-                                isTriggered = true
-                                onBarcodeDetected(code)
-                                return@addOnSuccessListener
+                            if (continuous) {
+                                val isDifferent = (code != lastScannedCode)
+                                val debounceTime = if (isDifferent) 900L else 3000L
+                                if (now - lastScannedTimestamp > debounceTime) {
+                                    lastScannedCode = code
+                                    lastScannedTimestamp = now
+                                    onBarcodeDetected(code)
+                                    return@addOnSuccessListener
+                                }
+                            } else {
+                                // Single-scan mode
+                                if (code != lastScannedCode || now - lastScannedTimestamp > 2500L) {
+                                    lastScannedCode = code
+                                    lastScannedTimestamp = now
+                                    isTriggered = true
+                                    onBarcodeDetected(code)
+                                    return@addOnSuccessListener
+                                }
                             }
                         }
                     }

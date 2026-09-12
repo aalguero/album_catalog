@@ -30,6 +30,7 @@ fun CameraPreviewView(
     scanMode: ScanMode,
     isScanningActive: Boolean,
     isTorchOn: Boolean,
+    isBatchMode: Boolean = false,
     onBarcodeDetected: (String) -> Unit,
     onLabelDetected: (String, String?) -> Unit,
     onLabelScanStateChanged: ((LabelScanState) -> Unit)? = null,
@@ -108,12 +109,14 @@ fun CameraPreviewView(
                         cameraExecutor,
                         BarcodeAnalyzer(
                             isScanningEnabled = { isScanningActive },
+                            isContinuousMode = { isBatchMode },
                             onBarcodeDetected = onBarcodeDetected
                         )
                     )
                 } else {
                     val analyzer = VinylLabelAnalyzer(
                         isScanningEnabled = { isScanningActive },
+                        isContinuousMode = { isBatchMode },
                         onLabelDetected = onLabelDetected,
                         onScanStateChanged = onLabelScanStateChanged
                     )

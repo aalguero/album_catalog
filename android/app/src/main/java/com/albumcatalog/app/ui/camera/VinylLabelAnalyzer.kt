@@ -24,6 +24,7 @@ data class LabelScanState(
 
 class VinylLabelAnalyzer(
     private val isScanningEnabled: () -> Boolean,
+    private val isContinuousMode: () -> Boolean = { false },
     private val onLabelDetected: (fullText: String, catno: String?) -> Unit,
     private val onScanStateChanged: ((LabelScanState) -> Unit)? = null
 ) : ImageAnalysis.Analyzer {
@@ -31,6 +32,8 @@ class VinylLabelAnalyzer(
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private var centeredStartTime: Long = 0L
     private val STABILITY_DWELL_MS = 650L
+    private var lastScannedTimestamp: Long = 0L
+    private var lastScannedCatno: String? = null
 
     // Regex matching vinyl label catalog numbers (e.g. BWZ804, DC980, BST-84154, PC 34474, ST-11531)
     private val catnoRegex = Regex(
@@ -49,6 +52,13 @@ class VinylLabelAnalyzer(
     var latestInsideCatno: String? = null
         private set
 
+    fun resetTrigger() {
+        isTriggered = false
+        centeredStartTime = 0L
+        lastScannedCatno = null
+        lastScannedTimestamp = 0L
+    }
+
     fun triggerManualCapture(): Boolean {
         if (latestInsideText.isNotBlank() && !isTriggered) {
             isTriggered = true
@@ -65,7 +75,8 @@ class VinylLabelAnalyzer(
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
-        if (!isScanningEnabled() || isTriggered) {
+        val continuous = isContinuousMode()
+        if (!isScanningEnabled() || (!continuous && isTriggered)) {
             imageProxy.close()
             return
         }
@@ -111,6 +122,9 @@ class VinylLabelAnalyzer(
                     centeredStartTime = 0L
                     latestInsideText = ""
                     latestInsideCatno = null
+                    if (continuous && System.currentTimeMillis() - lastScannedTimestamp > 1500L) {
+                        lastScannedCatno = null
+                    }
                     onScanStateChanged?.invoke(LabelScanState(LabelScanStatus.SEARCHING, 0f))
                     return@addOnSuccessListener
                 }
@@ -188,14 +202,32 @@ class VinylLabelAnalyzer(
                             candidateCatno = catnoMatch
                         ))
                     } else {
-                        // LOCKED! Trigger match query
-                        isTriggered = true
-                        onScanStateChanged?.invoke(LabelScanState(
-                            status = LabelScanStatus.LOCKED,
-                            progress = 1f,
-                            candidateCatno = catnoMatch
-                        ))
-                        onLabelDetected(fullInsideText, catnoMatch)
+                        val nowMs = System.currentTimeMillis()
+                        if (continuous) {
+                            val isDifferent = (catnoMatch != null && catnoMatch != lastScannedCatno)
+                            val cooldown = if (isDifferent) 1200L else 3500L
+                            if (nowMs - lastScannedTimestamp < cooldown) {
+                                return@addOnSuccessListener
+                            }
+                            lastScannedTimestamp = nowMs
+                            lastScannedCatno = catnoMatch
+                            centeredStartTime = 0L
+                            onScanStateChanged?.invoke(LabelScanState(
+                                status = LabelScanStatus.LOCKED,
+                                progress = 1f,
+                                candidateCatno = catnoMatch
+                            ))
+                            onLabelDetected(fullInsideText, catnoMatch)
+                        } else {
+                            // LOCKED! Trigger match query
+                            isTriggered = true
+                            onScanStateChanged?.invoke(LabelScanState(
+                                status = LabelScanStatus.LOCKED,
+                                progress = 1f,
+                                candidateCatno = catnoMatch
+                            ))
+                            onLabelDetected(fullInsideText, catnoMatch)
+                        }
                     }
                 }
             }

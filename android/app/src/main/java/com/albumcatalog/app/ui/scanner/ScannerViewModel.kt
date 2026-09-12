@@ -8,10 +8,13 @@ import com.albumcatalog.app.data.model.MatchCandidate
 import com.albumcatalog.app.data.repository.VinylRepository
 import com.albumcatalog.app.ui.camera.LabelScanState
 import com.albumcatalog.app.ui.camera.ScanMode
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.albumcatalog.app.data.local.BatchScanItem
+import com.albumcatalog.app.data.repository.BatchRepository
 import com.albumcatalog.app.util.FeedbackManager
 
 sealed class MatchUiState {
@@ -79,11 +82,86 @@ class ScannerViewModel(
     private val _manualCaptureTrigger = MutableStateFlow(0L)
     val manualCaptureTrigger: StateFlow<Long> = _manualCaptureTrigger.asStateFlow()
 
+    // Batch Crate-Digging Mode State
+    val batchRepository: BatchRepository = BatchRepository()
+
+    private val _isBatchMode = MutableStateFlow(false)
+    val isBatchMode: StateFlow<Boolean> = _isBatchMode.asStateFlow()
+
+    val batchQueueCount: StateFlow<Int> = batchRepository.countFlow
+    val batchItems: StateFlow<List<BatchScanItem>> = batchRepository.itemsFlow
+
+    private val _isReviewDeckOpen = MutableStateFlow(false)
+    val isReviewDeckOpen: StateFlow<Boolean> = _isReviewDeckOpen.asStateFlow()
+
+    private val _hudMessage = MutableStateFlow<String?>(null)
+    val hudMessage: StateFlow<String?> = _hudMessage.asStateFlow()
+
     // Staged items
     var stagedCandidate: MatchCandidate? = null
         private set
     var stagedPressing: DiscogsPressingOption? = null
         private set
+
+    fun toggleBatchMode() {
+        _isBatchMode.value = !_isBatchMode.value
+        if (_isBatchMode.value) {
+            showHud("Batch Mode ON • Crate-digging active")
+            _matchState.value = MatchUiState.Idle
+            _isScanningActive.value = true
+        } else {
+            showHud("Batch Mode OFF • Single scan active")
+        }
+    }
+
+    fun openReviewDeck() {
+        _isReviewDeckOpen.value = true
+    }
+
+    fun dismissReviewDeck() {
+        _isReviewDeckOpen.value = false
+    }
+
+    fun showHud(message: String) {
+        _hudMessage.value = message
+        viewModelScope.launch {
+            delay(2200L)
+            if (_hudMessage.value == message) {
+                _hudMessage.value = null
+            }
+        }
+    }
+
+    fun saveBatchItem(item: BatchScanItem) {
+        viewModelScope.launch {
+            val result = batchRepository.saveItemToCatalog(item)
+            result.onSuccess {
+                feedbackManager.onMatchSuccess()
+                showHud("Saved: ${it.title}")
+            }.onFailure { err ->
+                feedbackManager.onMatchMiss()
+                showHud("Save failed: ${err.localizedMessage ?: "Unknown error"}")
+            }
+        }
+    }
+
+    fun discardBatchItem(id: Long) {
+        batchRepository.discardItem(id)
+        showHud("Removed from batch queue")
+    }
+
+    fun saveAllBatchRemaining() {
+        viewModelScope.launch {
+            val saved = batchRepository.saveAllRemaining()
+            feedbackManager.onMatchSuccess()
+            showHud("Saved $saved album${if (saved != 1) "s" else ""} to collection!")
+        }
+    }
+
+    fun clearBatchQueue() {
+        batchRepository.clearQueue()
+        showHud("Queue cleared")
+    }
 
     fun setScanMode(mode: ScanMode) {
         _scanMode.value = mode
@@ -212,6 +290,14 @@ class ScannerViewModel(
 
     fun onBarcodeDetected(barcode: String) {
         if (!_isScanningActive.value) return
+
+        if (_isBatchMode.value) {
+            feedbackManager.onScanLocked()
+            batchRepository.enqueueScan("BARCODE", barcode, null)
+            showHud("📦 Queued Barcode: $barcode")
+            return
+        }
+
         _isScanningActive.value = false
         feedbackManager.onScanLocked()
         _matchState.value = MatchUiState.Matching
@@ -243,6 +329,16 @@ class ScannerViewModel(
 
     fun onLabelDetected(fullText: String, catno: String?) {
         if (!_isScanningActive.value) return
+
+        if (_isBatchMode.value) {
+            feedbackManager.onScanLocked()
+            batchRepository.enqueueScan("VINYL_LABEL", fullText, catno)
+            val desc = if (!catno.isNullOrBlank()) "Cat# $catno" else "Center Label"
+            showHud("📦 Queued Label: $desc")
+            _labelScanState.value = LabelScanState()
+            return
+        }
+
         _isScanningActive.value = false
         feedbackManager.onScanLocked()
         _matchState.value = MatchUiState.Matching

@@ -23,10 +23,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Search
@@ -73,7 +75,9 @@ import com.albumcatalog.app.ui.theme.TextPrimary
 import com.albumcatalog.app.ui.theme.TextSecondary
 import com.albumcatalog.app.ui.theme.TextTertiary
 import com.albumcatalog.app.ui.theme.VinylBlack
+import com.albumcatalog.app.ui.theme.VinylDarkSurface
 import com.albumcatalog.app.ui.theme.VinylGold
+import com.albumcatalog.app.ui.theme.VinylGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +94,12 @@ fun ScannerScreen(
     val labelScanState by viewModel.labelScanState.collectAsState()
     val manualCaptureTrigger by viewModel.manualCaptureTrigger.collectAsState()
 
+    val isBatchMode by viewModel.isBatchMode.collectAsState()
+    val batchQueueCount by viewModel.batchQueueCount.collectAsState()
+    val batchItems by viewModel.batchItems.collectAsState()
+    val isReviewDeckOpen by viewModel.isReviewDeckOpen.collectAsState()
+    val hudMessage by viewModel.hudMessage.collectAsState()
+
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -100,6 +110,7 @@ fun ScannerScreen(
             scanMode = scanMode,
             isScanningActive = isScanningActive,
             isTorchOn = isTorchOn,
+            isBatchMode = isBatchMode,
             onBarcodeDetected = { viewModel.onBarcodeDetected(it) },
             onLabelDetected = { text, catno -> viewModel.onLabelDetected(text, catno) },
             onLabelScanStateChanged = { viewModel.updateLabelScanState(it) },
@@ -212,13 +223,40 @@ fun ScannerScreen(
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Batch Mode Toggle Chip
+                    FilterChip(
+                        selected = isBatchMode,
+                        onClick = { viewModel.toggleBatchMode() },
+                        label = { Text("Batch", fontSize = 12.sp, fontWeight = if (isBatchMode) FontWeight.Bold else FontWeight.Normal) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Layers,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = VinylGold,
+                            selectedLabelColor = Color.Black,
+                            selectedLeadingIconColor = Color.Black,
+                            containerColor = Color.Black.copy(alpha = 0.65f),
+                            labelColor = Color.White,
+                            iconColor = Color.White
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isBatchMode,
+                            borderColor = if (isBatchMode) VinylGold else Color.White.copy(alpha = 0.35f)
+                        )
+                    )
+
                     // Resume button if scanning is paused
                     if (!isScanningActive && matchState is MatchUiState.Idle) {
                         IconButton(
                             onClick = { viewModel.resumeScanning() },
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(38.dp)
                                 .clip(CircleShape)
                                 .background(VinylGold)
                         ) {
@@ -230,7 +268,7 @@ fun ScannerScreen(
                     IconButton(
                         onClick = { viewModel.toggleTorch() },
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(38.dp)
                             .clip(CircleShape)
                             .background(Color.Black.copy(alpha = 0.65f))
                     ) {
@@ -265,6 +303,85 @@ fun ScannerScreen(
                     unfocusedTextColor = TextPrimary
                 )
             )
+        }
+
+        // 3.5. HUD Notification Banner
+        if (hudMessage != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 160.dp, start = 20.dp, end = 20.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.88f))
+                    .border(1.dp, VinylGold.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = VinylGreen,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = hudMessage!!,
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        // 3.6. Floating Batch Queue Pill Badge
+        if (batchQueueCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(
+                        bottom = if (scanMode == ScanMode.VINYL_LABEL && isScanningActive && matchState is MatchUiState.Idle) 116.dp else 36.dp
+                    )
+                    .clip(RoundedCornerShape(30.dp))
+                    .background(VinylDarkSurface.copy(alpha = 0.94f))
+                    .border(1.5.dp, VinylGold, RoundedCornerShape(30.dp))
+                    .clickable { viewModel.openReviewDeck() }
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(VinylGold),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (batchQueueCount > 99) "99+" else "$batchQueueCount",
+                            color = Color.Black,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                    Text(
+                        text = if (batchQueueCount == 1) "1 Album in Queue • Tap to Review" else "$batchQueueCount Albums in Queue • Tap to Review",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Layers,
+                        contentDescription = null,
+                        tint = VinylGold,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
         }
 
         // 4. Loading indicator when matching
@@ -667,6 +784,24 @@ fun ScannerScreen(
                         onCandidateSelectedForConfirmation(manualAlbum)
                     },
                     onDismiss = { viewModel.dismissOcrCorrection() }
+                )
+            }
+        }
+
+        // 9. Batch Review Deck Bottom Sheet
+        if (isReviewDeckOpen) {
+            val reviewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { viewModel.dismissReviewDeck() },
+                sheetState = reviewSheetState,
+                containerColor = VinylDarkSurface
+            ) {
+                BatchReviewDeckSheet(
+                    items = batchItems,
+                    onSaveItem = { item -> viewModel.saveBatchItem(item) },
+                    onDiscardItem = { id -> viewModel.discardBatchItem(id) },
+                    onSaveAllRemaining = { viewModel.saveAllBatchRemaining() },
+                    onDismiss = { viewModel.dismissReviewDeck() }
                 )
             }
         }

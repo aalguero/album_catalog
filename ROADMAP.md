@@ -141,8 +141,7 @@ flowchart TD
 | **Scanning Pause on Identification** | Phase 1 | Completed | `BarcodeAnalyzer.kt` & `ScannerViewModel.kt` |
 | **Vinyl Center Label Mode** | Phase 1 | Completed | `VinylLabelAnalyzer.kt` & `ScanOverlay.kt` |
 | **Manual Album Entry ('+' & No-Match)** | Phase 1 | Completed | `ManualAlbumSheet.kt` + `CatalogScreen.kt` + `OcrCorrectionSheet.kt` |
-| **Duplicate Warning & Multi-Copy** | Phase 1 | Completed | `backend/app/services/catalog_checker.py` + `StagedAlbumConfirmationCard.kt` |
-| **Batch Crate-Digging Queue** | Phase 1 | Planned | Android Room / SQLite queue + batch deck |
+| **Batch Crate-Digging Queue** | Phase 1 | Completed | `BatchRepository.kt` + SQLite queue + `BatchReviewDeckSheet.kt` |
 | **Audio & Haptic Feedback** | Phase 1 | Completed | `FeedbackManager.kt` & `SettingsScreen.kt` |
 | **Runout Dead Wax Matrix OCR** | Phase 2 | Planned | ML Kit / OpenCV contrast pipeline |
 | **Cover Art Visual Match** | Phase 2 | Planned | Image embedding matcher |
