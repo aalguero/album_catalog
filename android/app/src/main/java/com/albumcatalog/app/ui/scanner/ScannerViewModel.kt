@@ -336,7 +336,17 @@ class ScannerViewModel(
         _discogsState.value = DiscogsUiState.Hidden
     }
 
-    fun buildStagedAlbum(candidate: MatchCandidate, pressing: DiscogsPressingOption? = stagedPressing): Album {
+    fun buildStagedAlbum(
+        candidate: MatchCandidate,
+        pressing: DiscogsPressingOption? = stagedPressing,
+        isSingleMatch: Boolean = false
+    ): Album {
+        val isSpecific = pressing != null ||
+            isSingleMatch ||
+            candidate.discogsReleaseId != null ||
+            candidate.source == "discogs" ||
+            (candidate.catalogNumber != null && candidate.releaseYear != null && candidate.barcode != null)
+
         return Album(
             title = candidate.title,
             artist = candidate.artist,
@@ -346,7 +356,7 @@ class ScannerViewModel(
             barcode = candidate.barcode,
             country = pressing?.country ?: candidate.country,
             format = candidate.format,
-            pressingStatus = if (pressing != null) "specific" else "unspecific",
+            pressingStatus = if (isSpecific) "specific" else "unspecific",
             metadataSource = if (pressing != null) "discogs" else candidate.source,
             musicbrainzReleaseId = candidate.musicbrainzReleaseId,
             discogsReleaseId = pressing?.discogsId ?: candidate.discogsReleaseId,

@@ -99,12 +99,25 @@ fun EditAlbumDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Status: ${pressingStatus.uppercase()}",
-                        color = if (pressingStatus == "specific") VinylGreen else Color(0xFFB0BEC5),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(
+                                (if (pressingStatus == "specific") VinylGreen else Color(0xFFB0BEC5)).copy(alpha = 0.15f)
+                            )
+                            .clickable {
+                                pressingStatus = if (pressingStatus == "specific") "unspecific" else "specific"
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Status: ${pressingStatus.uppercase()} ✎",
+                            color = if (pressingStatus == "specific") VinylGreen else Color(0xFFB0BEC5),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
 
                     if (pressingStatus == "unspecific") {
                         OutlinedButton(
@@ -129,31 +142,54 @@ fun EditAlbumDialog(
                     }
                 }
 
-                // If pressing options are loaded, show list
+                // If pressing options are loaded, show list or empty message
                 availablePressings?.let { pressings ->
-                    Text("Select Specific Discogs Pressing:", fontSize = 12.sp, color = VinylGold, fontWeight = FontWeight.Bold)
-                    LazyColumn(modifier = Modifier.height(180.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(pressings) { p ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(VinylCard)
-                                    .border(1.dp, VinylBorder, RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        releaseYear = p.year?.toString() ?: releaseYear
-                                        label = p.label ?: label
-                                        catalogNumber = p.catalogNumber ?: catalogNumber
-                                        country = p.country ?: country
-                                        discogsReleaseId = p.discogsId
-                                        pressingStatus = "specific"
-                                        availablePressings = null
-                                    }
-                                    .padding(8.dp)
+                    if (pressings.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF1E1E24))
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text("No alternate pressings found on Discogs.", color = TextSecondary, fontSize = 12.sp)
+                            Button(
+                                onClick = {
+                                    pressingStatus = "specific"
+                                    availablePressings = null
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = VinylGreen, contentColor = Color.Black),
+                                shape = RoundedCornerShape(6.dp)
                             ) {
-                                Column {
-                                    Text("${p.year ?: "N/A"} • ${p.country ?: "N/A"} • ${p.label ?: "N/A"}", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text(p.formatDescription ?: "Vinyl", color = TextSecondary, fontSize = 11.sp)
+                                Text("Mark as Specific Pressing", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Text("Select Specific Discogs Pressing:", fontSize = 12.sp, color = VinylGold, fontWeight = FontWeight.Bold)
+                        LazyColumn(modifier = Modifier.height(180.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(pressings) { p ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(VinylCard)
+                                        .border(1.dp, VinylBorder, RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            releaseYear = p.year?.toString() ?: releaseYear
+                                            label = p.label ?: label
+                                            catalogNumber = p.catalogNumber ?: catalogNumber
+                                            country = p.country ?: country
+                                            discogsReleaseId = p.discogsId
+                                            pressingStatus = "specific"
+                                            availablePressings = null
+                                        }
+                                        .padding(8.dp)
+                                ) {
+                                    Column {
+                                        Text("${p.year ?: "N/A"} • ${p.country ?: "N/A"} • ${p.label ?: "N/A"}", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text(p.formatDescription ?: "Vinyl", color = TextSecondary, fontSize = 11.sp)
+                                    }
                                 }
                             }
                         }

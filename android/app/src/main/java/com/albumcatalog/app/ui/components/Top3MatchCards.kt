@@ -49,12 +49,14 @@ fun Top3MatchCards(
     onRefineWithDiscogs: (MatchCandidate) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isSingleMatch = candidates.size == 1
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Top Matches (${candidates.size})",
+            text = if (isSingleMatch) "Exact Pressing Match" else "Top Matches (${candidates.size})",
             color = VinylGold,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
@@ -65,6 +67,7 @@ fun Top3MatchCards(
             MatchCandidateCard(
                 rank = index + 1,
                 candidate = candidate,
+                canRefine = !isSingleMatch,
                 onQuickSave = { onSelectAndSaveUnspecific(candidate) },
                 onRefine = { onRefineWithDiscogs(candidate) }
             )
@@ -76,6 +79,7 @@ fun Top3MatchCards(
 fun MatchCandidateCard(
     rank: Int,
     candidate: MatchCandidate,
+    canRefine: Boolean = true,
     onQuickSave: () -> Unit,
     onRefine: () -> Unit
 ) {
@@ -129,19 +133,36 @@ fun MatchCandidateCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Confidence Pill
-                        Text(
-                            text = "${candidate.confidenceScore}% match",
-                            color = if (candidate.confidenceScore >= 90) VinylGreen else VinylGold,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .background(
-                                    (if (candidate.confidenceScore >= 90) VinylGreen else VinylGold).copy(alpha = 0.15f),
-                                    RoundedCornerShape(6.dp)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Confidence Pill
+                            Text(
+                                text = "${candidate.confidenceScore}% match",
+                                color = if (candidate.confidenceScore >= 90) VinylGreen else VinylGold,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .background(
+                                        (if (candidate.confidenceScore >= 90) VinylGreen else VinylGold).copy(alpha = 0.15f),
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+
+                            if (!canRefine) {
+                                Text(
+                                    text = "SPECIFIC PRESSING",
+                                    color = VinylGreen,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .background(VinylGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                            }
+                        }
 
                         Text(
                             text = candidate.source.replace("_", " ").uppercase(),
@@ -219,34 +240,50 @@ fun MatchCandidateCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Action Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            if (canRefine) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onQuickSave,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = VinylGold,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Quick Save", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    OutlinedButton(
+                        onClick = onRefine,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF81D4FA)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0288D1))
+                    ) {
+                        Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Refine Pressing", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            } else {
                 Button(
                     onClick = onQuickSave,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = VinylGold,
                         contentColor = Color.Black
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Quick Save", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                }
-
-                OutlinedButton(
-                    onClick = onRefine,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF81D4FA)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0288D1))
-                ) {
-                    Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Refine Pressing", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Save Pressing", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

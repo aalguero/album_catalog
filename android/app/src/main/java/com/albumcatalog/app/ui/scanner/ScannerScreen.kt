@@ -571,10 +571,11 @@ fun ScannerScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
+                    val isSingle = candidates.size == 1
                     Top3MatchCards(
                         candidates = candidates,
                         onSelectAndSaveUnspecific = { candidate ->
-                            val album = viewModel.buildStagedAlbum(candidate)
+                            val album = viewModel.buildStagedAlbum(candidate, isSingleMatch = isSingle)
                             viewModel.resetMatchState()
                             onCandidateSelectedForConfirmation(album)
                         },
@@ -629,7 +630,11 @@ fun ScannerScreen(
                     onKeepUnspecific = {
                         val candidate = viewModel.stagedCandidate
                         if (candidate != null) {
-                            val album = viewModel.buildStagedAlbum(candidate, null)
+                            val album = viewModel.buildStagedAlbum(
+                                candidate = candidate,
+                                pressing = null,
+                                isSingleMatch = pressings.isEmpty()
+                            )
                             viewModel.resetMatchState()
                             onCandidateSelectedForConfirmation(album)
                         }

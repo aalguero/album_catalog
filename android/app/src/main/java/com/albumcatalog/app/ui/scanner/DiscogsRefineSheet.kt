@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +44,7 @@ import com.albumcatalog.app.ui.theme.VinylBorder
 import com.albumcatalog.app.ui.theme.VinylCard
 import com.albumcatalog.app.ui.theme.VinylDarkSurface
 import com.albumcatalog.app.ui.theme.VinylGold
+import com.albumcatalog.app.ui.theme.VinylGreen
 
 @Composable
 fun DiscogsRefineSheet(
@@ -88,9 +90,20 @@ fun DiscogsRefineSheet(
         OutlinedButton(
             onClick = onKeepUnspecific,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp)
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = if (pressings.isEmpty() && !isLoading) VinylGreen else VinylGold
+            ),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (pressings.isEmpty() && !isLoading) VinylGreen else VinylGold
+            )
         ) {
-            Text("Skip & Keep Unspecific Pressing", color = VinylGold, fontSize = 13.sp)
+            Text(
+                text = if (pressings.isEmpty() && !isLoading) "Keep as Specific Pressing" else "Skip & Keep Current Pressing",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
         }
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -112,7 +125,7 @@ fun DiscogsRefineSheet(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No specific pressings found on Discogs.\nYou can save with preliminary metadata.",
+                    text = "No alternate pressings found on Discogs.\nThis release is saved as the unique specific pressing.",
                     color = TextSecondary,
                     fontSize = 14.sp
                 )
