@@ -801,6 +801,21 @@ fun ScannerScreen(
                     onSaveItem = { item -> viewModel.saveBatchItem(item) },
                     onDiscardItem = { id -> viewModel.discardBatchItem(id) },
                     onSaveAllRemaining = { viewModel.saveAllBatchRemaining() },
+                    onReSearchItem = { id, catno, artist, title, rawText ->
+                        viewModel.reSearchBatchItem(id, catno, artist, title, rawText)
+                    },
+                    onAttachCandidate = { id, candidate ->
+                        viewModel.attachCandidateToBatchItem(id, candidate)
+                    },
+                    onAddManualAlbum = { album ->
+                        viewModel.addManualAlbumToBatch(album)
+                    },
+                    onConvertItemToManual = { id, catno, artist, title, label, year ->
+                        viewModel.convertBatchItemToManual(id, catno, artist, title, label, year)
+                    },
+                    onPerformSearch = { query ->
+                        viewModel.performManualSearchQuery(query)
+                    },
                     onDismiss = { viewModel.dismissReviewDeck() }
                 )
             }

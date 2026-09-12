@@ -60,7 +60,10 @@ class BarcodeAnalyzer(
                             val now = System.currentTimeMillis()
                             if (continuous) {
                                 val isDifferent = (code != lastScannedCode)
-                                val debounceTime = if (isDifferent) 900L else 3000L
+                                // Prevent duplicate re-scans:
+                                // Same barcode: 20 seconds cooldown! (Prevents picking up dupes while handling/reading record)
+                                // Different barcode: 2.0 seconds debounce
+                                val debounceTime = if (isDifferent) 2000L else 20_000L
                                 if (now - lastScannedTimestamp > debounceTime) {
                                     lastScannedCode = code
                                     lastScannedTimestamp = now

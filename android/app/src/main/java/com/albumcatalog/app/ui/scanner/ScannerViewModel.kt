@@ -163,6 +163,69 @@ class ScannerViewModel(
         showHud("Queue cleared")
     }
 
+    fun reSearchBatchItem(
+        id: Long,
+        catno: String,
+        artist: String,
+        title: String,
+        rawText: String
+    ) {
+        viewModelScope.launch {
+            val result = batchRepository.reSearchItem(id, catno, artist, title, rawText)
+            result.onSuccess { candidates ->
+                if (candidates.isNotEmpty()) {
+                    feedbackManager.onMatchSuccess()
+                    showHud("Matched: ${candidates.first().title}")
+                } else {
+                    feedbackManager.onMatchMiss()
+                    showHud("No match found for edited terms")
+                }
+            }.onFailure { err ->
+                feedbackManager.onMatchMiss()
+                showHud("Search error: ${err.localizedMessage}")
+            }
+        }
+    }
+
+    fun attachCandidateToBatchItem(id: Long, candidate: MatchCandidate) {
+        batchRepository.attachCandidate(id, candidate)
+        feedbackManager.onMatchSuccess()
+        showHud("Linked: ${candidate.title}")
+    }
+
+    fun addManualAlbumToBatch(album: Album) {
+        batchRepository.addManualAlbum(album)
+        feedbackManager.onMatchSuccess()
+        showHud("Added to Batch: ${album.title}")
+    }
+
+    fun convertBatchItemToManual(
+        id: Long,
+        catno: String?,
+        artist: String,
+        title: String,
+        label: String?,
+        year: Int?
+    ) {
+        val manualCandidate = MatchCandidate(
+            title = title.ifBlank { "Untitled Album" },
+            artist = artist.ifBlank { "Unknown Artist" },
+            releaseYear = year,
+            label = label?.ifBlank { null },
+            catalogNumber = catno?.ifBlank { null },
+            source = "manual",
+            format = "Vinyl, LP"
+        )
+        batchRepository.attachCandidate(id, manualCandidate)
+        feedbackManager.onMatchSuccess()
+        showHud("Manual Album Set: ${manualCandidate.title}")
+    }
+
+    suspend fun performManualSearchQuery(query: String): List<MatchCandidate> {
+        val res = repository.manualSearch(query)
+        return res.getOrNull()?.candidates ?: emptyList()
+    }
+
     fun setScanMode(mode: ScanMode) {
         _scanMode.value = mode
         resetMatchState()
@@ -292,6 +355,9 @@ class ScannerViewModel(
         if (!_isScanningActive.value) return
 
         if (_isBatchMode.value) {
+            if (batchRepository.isBarcodeQueued(barcode)) {
+                return
+            }
             feedbackManager.onScanLocked()
             batchRepository.enqueueScan("BARCODE", barcode, null)
             showHud("📦 Queued Barcode: $barcode")
@@ -331,6 +397,9 @@ class ScannerViewModel(
         if (!_isScanningActive.value) return
 
         if (_isBatchMode.value) {
+            if (!catno.isNullOrBlank() && batchRepository.isCatnoQueued(catno)) {
+                return
+            }
             feedbackManager.onScanLocked()
             batchRepository.enqueueScan("VINYL_LABEL", fullText, catno)
             val desc = if (!catno.isNullOrBlank()) "Cat# $catno" else "Center Label"

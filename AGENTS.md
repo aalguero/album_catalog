@@ -67,9 +67,9 @@ Always check [`ROADMAP.md`](file:///home/andre/developer/album_catalog/ROADMAP.m
   5. Manual Album Entry (floating `+` FAB on collection screen + fallback on No-Match screen).
   6. Duplicate Warning & Multi-Copy Handling (`catalog_checker.py`, `StagedAlbumConfirmationCard.kt`, `Top3MatchCards.kt`).
   7. Audio & Haptic Sensory Feedback (`FeedbackManager.kt`, `ScannerViewModel.kt`, `SettingsScreen.kt`).
+  8. Batch "Crate-Digging" Mode (`BatchRepository.kt`, SQLite queue, live queue badge, `BatchReviewDeckSheet.kt`).
 - **Remaining / To Be Implemented**:
-  1. **Batch "Crate-Digging" Mode**:
-     - Scanner batch toggle, offline queue in Room/SQLite, live queue count badge, swipeable Batch Review Deck.
+  - Phase 1 Complete! Ready for Phase 2 (Dead wax matrix OCR, album cover match).
 
 ---
 

@@ -122,7 +122,7 @@ class VinylLabelAnalyzer(
                     centeredStartTime = 0L
                     latestInsideText = ""
                     latestInsideCatno = null
-                    if (continuous && System.currentTimeMillis() - lastScannedTimestamp > 1500L) {
+                    if (continuous && System.currentTimeMillis() - lastScannedTimestamp > 20_000L) {
                         lastScannedCatno = null
                     }
                     onScanStateChanged?.invoke(LabelScanState(LabelScanStatus.SEARCHING, 0f))
@@ -205,7 +205,7 @@ class VinylLabelAnalyzer(
                         val nowMs = System.currentTimeMillis()
                         if (continuous) {
                             val isDifferent = (catnoMatch != null && catnoMatch != lastScannedCatno)
-                            val cooldown = if (isDifferent) 1200L else 3500L
+                            val cooldown = if (isDifferent) 2500L else 20_000L
                             if (nowMs - lastScannedTimestamp < cooldown) {
                                 return@addOnSuccessListener
                             }

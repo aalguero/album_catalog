@@ -6,6 +6,7 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.albumcatalog.app.VinylCatalogApp
+import com.albumcatalog.app.data.model.Album
 import com.albumcatalog.app.data.model.MatchCandidate
 import com.google.gson.Gson
 
@@ -113,6 +114,85 @@ class BatchScanDatabaseHelper(
             if (notes != null) put(COL_NOTES, notes) else putNull(COL_NOTES)
         }
         db.update(TABLE_NAME, values, "$COL_ID = ?", arrayOf(id.toString()))
+    }
+
+    @Synchronized
+    fun isBarcodeQueued(barcode: String): Boolean {
+        val db = readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT 1 FROM $TABLE_NAME WHERE $COL_RAW_VALUE = ? LIMIT 1",
+            arrayOf(barcode.trim())
+        )
+        val exists = cursor.moveToFirst()
+        cursor.close()
+        return exists
+    }
+
+    @Synchronized
+    fun isCatnoQueued(catno: String): Boolean {
+        val db = readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT 1 FROM $TABLE_NAME WHERE $COL_DETECTED_CATNO = ? LIMIT 1",
+            arrayOf(catno.trim())
+        )
+        val exists = cursor.moveToFirst()
+        cursor.close()
+        return exists
+    }
+
+    @Synchronized
+    fun attachCandidateToItem(id: Long, candidate: MatchCandidate) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(COL_STATUS, "MATCHED")
+            put(COL_MATCH_JSON, gson.toJson(candidate))
+            putNull(COL_ERROR_MSG)
+            if (candidate.catalogNumber != null) {
+                put(COL_DETECTED_CATNO, candidate.catalogNumber)
+            }
+        }
+        db.update(TABLE_NAME, values, "$COL_ID = ?", arrayOf(id.toString()))
+    }
+
+    @Synchronized
+    fun updateScannedValues(id: Long, rawValue: String, detectedCatno: String?) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(COL_RAW_VALUE, rawValue)
+            put(COL_DETECTED_CATNO, detectedCatno)
+        }
+        db.update(TABLE_NAME, values, "$COL_ID = ?", arrayOf(id.toString()))
+    }
+
+    @Synchronized
+    fun addManualAlbum(album: Album): Long {
+        val db = writableDatabase
+        val candidate = MatchCandidate(
+            title = album.title,
+            artist = album.artist,
+            releaseYear = album.releaseYear,
+            label = album.label,
+            catalogNumber = album.catalogNumber,
+            barcode = album.barcode,
+            format = album.format,
+            country = album.country,
+            source = "manual",
+            tracks = album.tracks
+        )
+        val values = ContentValues().apply {
+            put(COL_SCAN_TYPE, "MANUAL")
+            put(COL_RAW_VALUE, "${album.artist} - ${album.title}")
+            put(COL_DETECTED_CATNO, album.catalogNumber)
+            put(COL_TIMESTAMP, System.currentTimeMillis())
+            put(COL_STATUS, "MATCHED")
+            put(COL_MATCH_JSON, gson.toJson(candidate))
+            put(COL_MEDIA_COND, album.mediaCondition)
+            put(COL_SLEEVE_COND, album.sleeveCondition)
+            if (album.purchasePrice != null) put(COL_PRICE, album.purchasePrice) else putNull(COL_PRICE)
+            if (album.shelfLocation != null) put(COL_SHELF, album.shelfLocation) else putNull(COL_SHELF)
+            if (album.notes != null) put(COL_NOTES, album.notes) else putNull(COL_NOTES)
+        }
+        return db.insert(TABLE_NAME, null, values)
     }
 
     @Synchronized

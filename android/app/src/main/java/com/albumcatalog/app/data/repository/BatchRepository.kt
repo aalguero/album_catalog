@@ -3,6 +3,7 @@ package com.albumcatalog.app.data.repository
 import com.albumcatalog.app.data.local.BatchScanDatabaseHelper
 import com.albumcatalog.app.data.local.BatchScanItem
 import com.albumcatalog.app.data.model.Album
+import com.albumcatalog.app.data.model.MatchCandidate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,6 +30,9 @@ class BatchRepository(
         processPending()
     }
 
+    fun isBarcodeQueued(barcode: String): Boolean = dbHelper.isBarcodeQueued(barcode)
+    fun isCatnoQueued(catno: String): Boolean = dbHelper.isCatnoQueued(catno)
+
     fun refresh() {
         scope.launch {
             val items = dbHelper.getAllItems()
@@ -42,6 +46,54 @@ class BatchRepository(
         refresh()
         resolveMetadata(id, scanType, rawValue, detectedCatno)
         return id
+    }
+
+    fun addManualAlbum(album: Album) {
+        scope.launch {
+            dbHelper.addManualAlbum(album)
+            refresh()
+        }
+    }
+
+    fun attachCandidate(id: Long, candidate: MatchCandidate) {
+        scope.launch {
+            dbHelper.attachCandidateToItem(id, candidate)
+            refresh()
+        }
+    }
+
+    suspend fun reSearchItem(
+        id: Long,
+        catno: String,
+        artist: String,
+        title: String,
+        rawText: String
+    ): Result<List<MatchCandidate>> = withContext(Dispatchers.IO) {
+        dbHelper.updateMatch(id, "MATCHING", null)
+        dbHelper.updateScannedValues(id, rawText, catno.ifBlank { null })
+        refresh()
+
+        val result = vinylRepository.searchWithCorrections(
+            catno = catno,
+            artist = artist,
+            title = title,
+            fullText = rawText
+        )
+
+        result.onSuccess { response ->
+            if (response.candidates.isNotEmpty()) {
+                val top = response.candidates.first()
+                dbHelper.updateMatch(id, "MATCHED", top)
+            } else {
+                dbHelper.updateMatch(id, "NO_MATCH", null)
+            }
+            refresh()
+        }.onFailure { err ->
+            dbHelper.updateMatch(id, "ERROR", null, err.localizedMessage ?: "Search failed")
+            refresh()
+        }
+
+        result.map { it.candidates }
     }
 
     private fun processPending() {
