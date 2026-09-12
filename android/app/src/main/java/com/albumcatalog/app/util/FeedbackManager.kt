@@ -37,10 +37,8 @@ class FeedbackManager(private val context: Context = VinylCatalogApp.instance) {
 
     init {
         try {
-            // Lock cue: 25ms crisp mechanical tick (2400 Hz)
-            lockTrack = createToneTrack(
-                listOf(Pair(2400.0, 0.025))
-            )
+            // Lock cue: 16ms subtle, warm mechanical click (720 Hz + 380 Hz body, soft amplitude)
+            lockTrack = createClickTrack()
             // Match success cue: Upward bright two-tone chime D5 (587 Hz, 75ms) -> A5 (880 Hz, 140ms)
             successTrack = createToneTrack(
                 listOf(
@@ -60,6 +58,55 @@ class FeedbackManager(private val context: Context = VinylCatalogApp.instance) {
         try {
             toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
         } catch (_: Exception) {}
+    }
+
+    private fun createClickTrack(): AudioTrack? {
+        try {
+            val sampleRate = 44100
+            val durationSec = 0.016 // 16ms micro-click
+            val totalSamples = (sampleRate * durationSec).toInt()
+            val buffer = ShortArray(totalSamples)
+
+            for (i in 0 until totalSamples) {
+                val t = i.toDouble() / sampleRate
+                // Dual-frequency warm acoustic transient: 720 Hz primary + 380 Hz low resonance
+                val wave = 0.65 * sin(2.0 * PI * 720.0 * t) + 0.35 * sin(2.0 * PI * 380.0 * t)
+                val attackTime = 0.0015
+                val decayProgress = (t - attackTime).coerceAtLeast(0.0) / (durationSec - attackTime)
+                val envelope = if (t < attackTime) {
+                    t / attackTime
+                } else {
+                    exp(-6.5 * decayProgress) // Rapid natural damping
+                }
+                // Soft, non-fatiguing volume (0.38)
+                val sampleValue = (wave * envelope * Short.MAX_VALUE * 0.38).toInt()
+                    .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                buffer[i] = sampleValue.toShort()
+            }
+
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
+            val format = AudioFormat.Builder()
+                .setSampleRate(sampleRate)
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                .build()
+
+            val track = AudioTrack(
+                audioAttributes,
+                format,
+                buffer.size * 2,
+                AudioTrack.MODE_STATIC,
+                AudioManager.AUDIO_SESSION_ID_GENERATE
+            )
+            track.write(buffer, 0, buffer.size)
+            return track
+        } catch (_: Exception) {
+            return null
+        }
     }
 
     private fun createToneTrack(notes: List<Pair<Double, Double>>): AudioTrack? {
@@ -159,7 +206,7 @@ class FeedbackManager(private val context: Context = VinylCatalogApp.instance) {
 
         // Audio lock tick
         if (VinylCatalogApp.instance.isAudioFeedbackEnabled()) {
-            playTrack(lockTrack, ToneGenerator.TONE_PROP_BEEP, 30)
+            playTrack(lockTrack, ToneGenerator.TONE_CDMA_KEYPAD_VOLUME_KEY_LITE, 20)
         }
     }
 
