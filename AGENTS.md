@@ -52,6 +52,22 @@ Do NOT spend time searching for binaries or paths; use these exact configuration
     PYTHONPATH=backend backend/.venv/bin/python backend/tests/test_backend.py
     ```
 
+- **Permanent Server (`futileassistant`)**:
+  - Host: `futileassistant` (`100.108.86.16` Tailscale / `192.168.86.35` LAN)
+  - User: `dremon`
+  - Application Directory: `/home/dremon/album_catalog`
+  - Container runtime: Docker Compose (`network_mode: "host"`, `restart: unless-stopped`)
+  - Server commands:
+    ```bash
+    ssh dremon@futileassistant "cd /home/dremon/album_catalog && docker-compose ps"
+    ssh dremon@futileassistant "cd /home/dremon/album_catalog && docker-compose logs -f"
+    ssh dremon@futileassistant "cd /home/dremon/album_catalog && docker-compose up -d --build"
+    ```
+  - Databases on `futileassistant`:
+    - `vinyl_catalog`: Personal user catalog (`albums`, `tracks`).
+    - `musicbrainz`: Local MusicBrainz dump for instant offline metadata queries.
+  - Android Base URL: `http://192.168.86.35:8000/` (LAN) or `http://100.108.86.16:8000/` (Tailscale).
+
 ---
 
 ## 3. Roadmap & Feature Status
