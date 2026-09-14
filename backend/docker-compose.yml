@@ -1,0 +1,11 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: album-catalog-backend:latest
+    container_name: album_catalog_backend
+    restart: unless-stopped
+    network_mode: "host"
+    env_file:
+      - .env
