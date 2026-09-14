@@ -83,7 +83,7 @@ fun CameraPreviewView(
     LaunchedEffect(cameraProvider, isScanningActive, scanMode) {
         val provider = cameraProvider ?: return@LaunchedEffect
 
-        if (!isScanningActive) {
+        if (!isScanningActive || scanMode == ScanMode.MANUAL) {
             try {
                 camera?.cameraControl?.enableTorch(false)
                 currentLabelAnalyzer = null
@@ -170,8 +170,10 @@ fun CameraPreviewView(
         }
     }
 
-    AndroidView(
-        factory = { previewView },
-        modifier = modifier.fillMaxSize()
-    )
+    if (scanMode != ScanMode.MANUAL) {
+        AndroidView(
+            factory = { previewView },
+            modifier = modifier.fillMaxSize()
+        )
+    }
 }

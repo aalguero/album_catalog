@@ -140,7 +140,7 @@ flowchart TD
 | **Catalog Entry Editing & Pressing Upgrade** | Phase 1 | Completed | `backend/` + `CatalogScreen.kt` |
 | **Scanning Pause on Identification** | Phase 1 | Completed | `BarcodeAnalyzer.kt` & `ScannerViewModel.kt` |
 | **Vinyl Center Label Mode** | Phase 1 | Completed | `VinylLabelAnalyzer.kt` & `ScanOverlay.kt` |
-| **Manual Album Entry ('+' & No-Match)** | Phase 1 | Completed | `ManualAlbumSheet.kt` + `CatalogScreen.kt` + `OcrCorrectionSheet.kt` |
+| **Manual Entry Mode (Zero-Scan & Blank Form)** | Phase 1 | Completed | Dedicated 'Manual' mode pill, camera sensor power-down, online search/autofill, and blank form entry |
 | **Batch Crate-Digging Queue** | Phase 1 | Completed | `BatchRepository.kt` + SQLite queue + `BatchReviewDeckSheet.kt` |
 | **Audio & Haptic Feedback** | Phase 1 | Completed | `FeedbackManager.kt` & `SettingsScreen.kt` |
 | **Runout Dead Wax Matrix OCR** | Phase 2 | Planned | ML Kit / OpenCV contrast pipeline |

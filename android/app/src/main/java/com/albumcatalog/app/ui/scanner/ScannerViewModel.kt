@@ -229,6 +229,12 @@ class ScannerViewModel(
     fun setScanMode(mode: ScanMode) {
         _scanMode.value = mode
         resetMatchState()
+        if (mode == ScanMode.MANUAL) {
+            _isScanningActive.value = false
+            _isTorchOn.value = false
+        } else {
+            _isScanningActive.value = true
+        }
     }
 
     fun toggleTorch() {
@@ -244,6 +250,14 @@ class ScannerViewModel(
     }
 
     fun resumeScanning() {
+        if (_scanMode.value == ScanMode.MANUAL) {
+            _matchState.value = MatchUiState.Idle
+            _discogsState.value = DiscogsUiState.Hidden
+            _ocrCorrectionState.value = OcrCorrectionState(isVisible = false)
+            stagedCandidate = null
+            stagedPressing = null
+            return
+        }
         _isScanningActive.value = true
         _matchState.value = MatchUiState.Idle
         _discogsState.value = DiscogsUiState.Hidden
@@ -540,7 +554,7 @@ class ScannerViewModel(
         _discogsState.value = DiscogsUiState.Hidden
         _ocrCorrectionState.value = OcrCorrectionState(isVisible = false)
         _labelScanState.value = LabelScanState()
-        _isScanningActive.value = true
+        _isScanningActive.value = _scanMode.value != ScanMode.MANUAL
         stagedCandidate = null
         stagedPressing = null
     }

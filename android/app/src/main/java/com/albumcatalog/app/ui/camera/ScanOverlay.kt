@@ -36,7 +36,8 @@ import androidx.compose.ui.graphics.StrokeCap
 
 enum class ScanMode {
     BARCODE,
-    VINYL_LABEL
+    VINYL_LABEL,
+    MANUAL
 }
 
 @Composable
@@ -45,6 +46,8 @@ fun ScanOverlay(
     isScanningActive: Boolean = true,
     labelScanState: LabelScanState = LabelScanState()
 ) {
+    if (scanMode == ScanMode.MANUAL) return
+
     val infiniteTransition = rememberInfiniteTransition(label = "laser")
     val laserPosition by infiniteTransition.animateFloat(
         initialValue = 0f,

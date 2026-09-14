@@ -1,6 +1,6 @@
 package com.albumcatalog.app.ui.scanner
 
-import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,18 +14,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Layers
@@ -39,6 +44,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
@@ -54,13 +60,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.widget.Toast
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,6 +79,7 @@ import com.albumcatalog.app.ui.camera.CameraPreviewView
 import com.albumcatalog.app.ui.camera.LabelScanStatus
 import com.albumcatalog.app.ui.camera.ScanMode
 import com.albumcatalog.app.ui.camera.ScanOverlay
+import com.albumcatalog.app.ui.catalog.ManualAlbumSheet
 import com.albumcatalog.app.ui.components.Top3MatchCards
 import com.albumcatalog.app.ui.theme.TextPrimary
 import com.albumcatalog.app.ui.theme.TextSecondary
@@ -101,37 +111,46 @@ fun ScannerScreen(
     val hudMessage by viewModel.hudMessage.collectAsState()
 
     val context = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var searchQuery by remember { mutableStateOf("") }
+    var manualSearchQuery by remember { mutableStateOf("") }
+    var isManualBlankSheetOpen by remember { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 1. Camera Preview
-        CameraPreviewView(
-            scanMode = scanMode,
-            isScanningActive = isScanningActive,
-            isTorchOn = isTorchOn,
-            isBatchMode = isBatchMode,
-            onBarcodeDetected = { viewModel.onBarcodeDetected(it) },
-            onLabelDetected = { text, catno -> viewModel.onLabelDetected(text, catno) },
-            onLabelScanStateChanged = { viewModel.updateLabelScanState(it) },
-            manualCaptureTrigger = manualCaptureTrigger,
-            onManualCaptureResult = { success ->
-                if (!success) {
-                    Toast.makeText(
-                        context,
-                        "Align label inside circle before capturing",
-                        Toast.LENGTH_SHORT
-                    ).show()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(VinylBlack)
+    ) {
+        // 1. Camera Preview & Viewfinder Overlay (Disabled in MANUAL mode)
+        if (scanMode != ScanMode.MANUAL) {
+            CameraPreviewView(
+                scanMode = scanMode,
+                isScanningActive = isScanningActive,
+                isTorchOn = isTorchOn,
+                isBatchMode = isBatchMode,
+                onBarcodeDetected = { viewModel.onBarcodeDetected(it) },
+                onLabelDetected = { text, catno -> viewModel.onLabelDetected(text, catno) },
+                onLabelScanStateChanged = { viewModel.updateLabelScanState(it) },
+                manualCaptureTrigger = manualCaptureTrigger,
+                onManualCaptureResult = { success ->
+                    if (!success) {
+                        Toast.makeText(
+                            context,
+                            "Align label inside circle before capturing",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
-            }
-        )
+            )
 
-        // 2. Viewfinder Overlay
-        ScanOverlay(
-            scanMode = scanMode,
-            isScanningActive = isScanningActive,
-            labelScanState = labelScanState
-        )
+            // 2. Viewfinder Overlay
+            ScanOverlay(
+                scanMode = scanMode,
+                isScanningActive = isScanningActive,
+                labelScanState = labelScanState
+            )
+        }
 
         // 2.5. Vinyl Label Manual Capture Shutter Button
         if (scanMode == ScanMode.VINYL_LABEL && isScanningActive && matchState is MatchUiState.Idle) {
@@ -191,7 +210,7 @@ fun ScannerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Mode Toggle: Barcode vs Vinyl Label
+                // Mode Toggle: Barcode vs Vinyl Label vs Manual
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(24.dp))
@@ -221,92 +240,120 @@ fun ScannerScreen(
                             selectedLeadingIconColor = Color.Black
                         )
                     )
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // Batch Mode Toggle Chip
                     FilterChip(
-                        selected = isBatchMode,
-                        onClick = { viewModel.toggleBatchMode() },
-                        label = { Text("Batch", fontSize = 12.sp, fontWeight = if (isBatchMode) FontWeight.Bold else FontWeight.Normal) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Layers,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        },
+                        selected = scanMode == ScanMode.MANUAL,
+                        onClick = { viewModel.setScanMode(ScanMode.MANUAL) },
+                        label = { Text("Manual", fontSize = 12.sp) },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp)) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = VinylGold,
+                            selectedContainerColor = Color(0xFFCE93D8),
                             selectedLabelColor = Color.Black,
-                            selectedLeadingIconColor = Color.Black,
-                            containerColor = Color.Black.copy(alpha = 0.65f),
-                            labelColor = Color.White,
-                            iconColor = Color.White
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = isBatchMode,
-                            borderColor = if (isBatchMode) VinylGold else Color.White.copy(alpha = 0.35f)
+                            selectedLeadingIconColor = Color.Black
                         )
                     )
+                }
 
-                    // Resume button if scanning is paused
-                    if (!isScanningActive && matchState is MatchUiState.Idle) {
+                if (scanMode != ScanMode.MANUAL) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // Batch Mode Toggle Chip
+                        FilterChip(
+                            selected = isBatchMode,
+                            onClick = { viewModel.toggleBatchMode() },
+                            label = { Text("Batch", fontSize = 12.sp, fontWeight = if (isBatchMode) FontWeight.Bold else FontWeight.Normal) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Layers,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = VinylGold,
+                                selectedLabelColor = Color.Black,
+                                selectedLeadingIconColor = Color.Black,
+                                containerColor = Color.Black.copy(alpha = 0.65f),
+                                labelColor = Color.White,
+                                iconColor = Color.White
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isBatchMode,
+                                borderColor = if (isBatchMode) VinylGold else Color.White.copy(alpha = 0.35f)
+                            )
+                        )
+
+                        // Resume button if scanning is paused
+                        if (!isScanningActive && matchState is MatchUiState.Idle) {
+                            IconButton(
+                                onClick = { viewModel.resumeScanning() },
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(VinylGold)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Resume", tint = Color.Black)
+                            }
+                        }
+
+                        // Torch Toggle
                         IconButton(
-                            onClick = { viewModel.resumeScanning() },
+                            onClick = { viewModel.toggleTorch() },
                             modifier = Modifier
                                 .size(38.dp)
                                 .clip(CircleShape)
-                                .background(VinylGold)
+                                .background(Color.Black.copy(alpha = 0.65f))
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Resume", tint = Color.Black)
+                            Icon(
+                                imageVector = if (isTorchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                                contentDescription = "Torch",
+                                tint = if (isTorchOn) VinylGold else Color.White
+                            )
                         }
-                    }
-
-                    // Torch Toggle
-                    IconButton(
-                        onClick = { viewModel.toggleTorch() },
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.65f))
-                    ) {
-                        Icon(
-                            imageVector = if (isTorchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                            contentDescription = "Torch",
-                            tint = if (isTorchOn) VinylGold else Color.White
-                        )
                     }
                 }
             }
 
-            // Quick Manual Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search title, artist, or cat# manually...", fontSize = 13.sp, color = TextSecondary) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.65f)),
-                singleLine = true,
-                trailingIcon = {
-                    IconButton(onClick = { viewModel.performManualSearch(searchQuery) }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = VinylGold)
-                    }
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = VinylGold,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
+            if (scanMode != ScanMode.MANUAL) {
+                // Quick Manual Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search title, artist, or cat# manually...", fontSize = 13.sp, color = TextSecondary) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.65f)),
+                    singleLine = true,
+                    trailingIcon = {
+                        IconButton(onClick = { viewModel.performManualSearch(searchQuery) }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = VinylGold)
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = VinylGold,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
                 )
-            )
+            } else {
+                // Dedicated Manual Entry Workspace
+                ManualEntryWorkspace(
+                    searchQuery = manualSearchQuery,
+                    onSearchQueryChange = { manualSearchQuery = it },
+                    onSearchSubmit = {
+                        keyboardController?.hide()
+                        viewModel.performManualSearch(manualSearchQuery)
+                    },
+                    onOpenBlankForm = {
+                        isManualBlankSheetOpen = true
+                    }
+                )
+            }
         }
 
         // 3.5. HUD Notification Banner
-        if (hudMessage != null) {
+        if (hudMessage != null && scanMode != ScanMode.MANUAL) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -337,7 +384,7 @@ fun ScannerScreen(
         }
 
         // 3.6. Floating Batch Queue Pill Badge
-        if (batchQueueCount > 0) {
+        if (batchQueueCount > 0 && scanMode != ScanMode.MANUAL) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -402,7 +449,7 @@ fun ScannerScreen(
         }
 
         // 4.5. Camera Standby Overlay (Battery Saver Mode)
-        if (!isScanningActive && matchState is MatchUiState.Idle) {
+        if (!isScanningActive && matchState is MatchUiState.Idle && scanMode != ScanMode.MANUAL) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -619,41 +666,57 @@ fun ScannerScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E2E36), contentColor = TextPrimary),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Scan Again", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            Text(if (scanMode == ScanMode.MANUAL) "Close" else "Scan Again", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                         }
 
-                        OutlinedButton(
-                            onClick = {
-                                searchQuery = noMatch.detectedCatno ?: noMatch.scannedValue.lines().firstOrNull() ?: noMatch.scannedValue
-                                viewModel.resumeScanning()
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = VinylGold),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, VinylGold)
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Edit in Search", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
+                        if (scanMode == ScanMode.MANUAL) {
+                            Button(
+                                onClick = {
+                                    viewModel.resumeScanning()
+                                    isManualBlankSheetOpen = true
+                                },
+                                modifier = Modifier.weight(1.5f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCE93D8), contentColor = Color.Black),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Create Blank Record", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = {
+                                    searchQuery = noMatch.detectedCatno ?: noMatch.scannedValue.lines().firstOrNull() ?: noMatch.scannedValue
+                                    viewModel.resumeScanning()
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = VinylGold),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, VinylGold)
+                            ) {
+                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Edit in Search", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
 
-                        Button(
-                            onClick = {
-                                viewModel.openOcrCorrection(
-                                    catno = noMatch.detectedCatno,
-                                    artist = noMatch.artist,
-                                    title = noMatch.title,
-                                    rawText = noMatch.scannedValue,
-                                    scanType = noMatch.queryType
-                                )
-                            },
-                            modifier = Modifier.weight(1.2f),
-                            colors = ButtonDefaults.buttonColors(containerColor = VinylGold, contentColor = Color.Black),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Edit OCR", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Button(
+                                onClick = {
+                                    viewModel.openOcrCorrection(
+                                        catno = noMatch.detectedCatno,
+                                        artist = noMatch.artist,
+                                        title = noMatch.title,
+                                        rawText = noMatch.scannedValue,
+                                        scanType = noMatch.queryType
+                                    )
+                                },
+                                modifier = Modifier.weight(1.2f),
+                                colors = ButtonDefaults.buttonColors(containerColor = VinylGold, contentColor = Color.Black),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Edit OCR", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
                         }
                     }
                 }
@@ -820,5 +883,192 @@ fun ScannerScreen(
                 )
             }
         }
+
+        // 10. Blank Manual Album Creation Sheet
+        if (isManualBlankSheetOpen) {
+            val manualSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { isManualBlankSheetOpen = false },
+                sheetState = manualSheetState,
+                containerColor = VinylBlack
+            ) {
+                ManualAlbumSheet(
+                    onSaveAlbum = { album ->
+                        isManualBlankSheetOpen = false
+                        onCandidateSelectedForConfirmation(album)
+                    },
+                    onDismiss = { isManualBlankSheetOpen = false }
+                )
+            }
+        }
     }
 }
+
+@Composable
+private fun ManualEntryWorkspace(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit,
+    onOpenBlankForm: () -> Unit
+) {
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+            .verticalScroll(scrollState)
+            .padding(top = 12.dp, bottom = 48.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Status banner
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF1E1E24))
+                .border(1.dp, Color(0xFF2E2E38), RoundedCornerShape(12.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(VinylGreen)
+            )
+            Text(
+                text = "Manual Mode Active • Camera Sensor Powered Down",
+                color = TextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        // Section 1: Search Online Databases
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF1A1A22))
+                .border(1.dp, Color(0xFF2E2E38), RoundedCornerShape(16.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = VinylGold,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = "Search & Auto-Fill Release",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            }
+
+            Text(
+                text = "Look up releases in MusicBrainz (5.67M releases) and Discogs by entering the artist, album name, or catalog number.",
+                fontSize = 12.sp,
+                color = TextSecondary
+            )
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                label = { Text("Artist, Album, or Cat#") },
+                placeholder = { Text("e.g. Led Zeppelin IV, BST 81595, Pink Floyd") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VinylGold,
+                    unfocusedBorderColor = Color(0xFF3E3E48),
+                    focusedTextColor = TextPrimary,
+                    unfocusedTextColor = TextPrimary,
+                    focusedLabelColor = VinylGold,
+                    unfocusedLabelColor = TextSecondary
+                )
+            )
+
+            Button(
+                onClick = onSearchSubmit,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = searchQuery.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = VinylGold, contentColor = Color.Black),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Search Database Releases", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+
+        // Divider
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF2E2E38))
+            Text("OR", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextTertiary)
+            HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF2E2E38))
+        }
+
+        // Section 2: Blank Form Entry
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF1A1A22))
+                .border(1.dp, Color(0xFF2E2E38), RoundedCornerShape(16.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.EditNote,
+                    contentDescription = null,
+                    tint = Color(0xFFCE93D8),
+                    modifier = Modifier.size(22.dp)
+                )
+                Text(
+                    text = "Create Blank Custom Record",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            }
+
+            Text(
+                text = "For unreleased pressings, private press, test pressings, local bands, or bootlegs not found online. Enter title, artist, tracklist, grading, and notes directly.",
+                fontSize = 12.sp,
+                color = TextSecondary
+            )
+
+            OutlinedButton(
+                onClick = onOpenBlankForm,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFCE93D8)),
+                border = BorderStroke(1.dp, Color(0xFFCE93D8)),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Open Blank Entry Form", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
