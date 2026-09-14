@@ -1,6 +1,7 @@
 package com.albumcatalog.app.ui.settings
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,10 +10,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -40,8 +46,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.albumcatalog.app.VinylCatalogApp
@@ -53,13 +63,19 @@ import com.albumcatalog.app.ui.theme.VinylGold
 import com.albumcatalog.app.ui.theme.VinylGreen
 import com.albumcatalog.app.ui.theme.VinylRed
 import com.albumcatalog.app.util.FeedbackManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingsScreen(
     repository: VinylRepository = remember { VinylRepository() }
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scrollState = rememberScrollState()
+
     var urlInput by remember { mutableStateOf(VinylCatalogApp.instance.getBaseUrl()) }
     var isChecking by remember { mutableStateOf(false) }
     var connectionStatus by remember { mutableStateOf<Boolean?>(null) }
@@ -79,7 +95,8 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(VinylBlack)
-            .verticalScroll(rememberScrollState())
+            .imePadding()
+            .verticalScroll(scrollState)
             .padding(top = 44.dp, start = 16.dp, end = 16.dp, bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -280,21 +297,79 @@ fun SettingsScreen(
                 connectionStatus = null
             },
             label = { Text("Backend Base URL") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            modifier = Modifier
+                .fillMaxWidth()
+                .bringIntoViewRequester(bringIntoViewRequester)
+                .onFocusEvent { focusState ->
+                    if (focusState.isFocused) {
+                        coroutineScope.launch {
+                            delay(250)
+                            bringIntoViewRequester.bringIntoView()
+                        }
+                    }
+                },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Uri,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    keyboardController?.hide()
+                }
+            )
         )
 
-        // Presets
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Quick Presets
+        Text(
+            text = "Quick Presets:",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = TextSecondary
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = {
+                    val url = "http://192.168.86.35:8000/"
+                    urlInput = url
+                    VinylCatalogApp.instance.setBaseUrl(url)
+                    connectionStatus = null
+                    keyboardController?.hide()
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Server LAN", fontSize = 11.sp, maxLines = 1)
+            }
+            OutlinedButton(
+                onClick = {
+                    val url = "http://100.108.86.16:8000/"
+                    urlInput = url
+                    VinylCatalogApp.instance.setBaseUrl(url)
+                    connectionStatus = null
+                    keyboardController?.hide()
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Tailscale", fontSize = 11.sp, maxLines = 1)
+            }
             OutlinedButton(
                 onClick = {
                     val emu = "http://10.0.2.2:8000/"
                     urlInput = emu
                     VinylCatalogApp.instance.setBaseUrl(emu)
+                    connectionStatus = null
+                    keyboardController?.hide()
                 },
+                modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Emulator (10.0.2.2)", fontSize = 12.sp)
+                Text("Emulator", fontSize = 11.sp, maxLines = 1)
             }
         }
 
@@ -302,6 +377,7 @@ fun SettingsScreen(
 
         Button(
             onClick = {
+                keyboardController?.hide()
                 isChecking = true
                 coroutineScope.launch {
                     val result = repository.checkHealth()
