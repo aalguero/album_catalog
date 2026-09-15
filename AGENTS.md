@@ -74,18 +74,23 @@ Do NOT spend time searching for binaries or paths; use these exact configuration
 
 Always check [`ROADMAP.md`](file:///home/andre/developer/album_catalog/ROADMAP.md) as the source of truth for features and defects.
 
-### Phase 1: High-Throughput Scanning & Usability (Active Phase)
-- **Completed**:
+### Active Phase: Phase 3 (Collection Valuation, Sync & Intelligence)
+- **Completed (Phase 1: High-Throughput Scanning & Usability)**:
   1. Direct Discogs Barcode Fallback (`backend/app/routers/matcher.py`).
   2. Catalog Entry Editing & Pressing Refinement (`CatalogScreen.kt`, `EditAlbumDialog.kt`, backend PUT/PATCH).
   3. Scanning Pause & Battery Saver (unbinds CameraX sensor during dialogs and lookups).
   4. Vinyl Center Label Mode (circular reticle, spindle centroid checks, 650ms dwell timer, manual shutter).
-  5. Manual Album Entry (floating `+` FAB on collection screen + fallback on No-Match screen).
+  5. Manual Album Entry (dedicated zero-scan Manual mode pill, floating `+` FAB on collection, and blank form).
   6. Duplicate Warning & Multi-Copy Handling (`catalog_checker.py`, `StagedAlbumConfirmationCard.kt`, `Top3MatchCards.kt`).
   7. Audio & Haptic Sensory Feedback (`FeedbackManager.kt`, `ScannerViewModel.kt`, `SettingsScreen.kt`).
   8. Batch "Crate-Digging" Mode (`BatchRepository.kt`, SQLite queue, live queue badge, `BatchReviewDeckSheet.kt`).
-- **Remaining / To Be Implemented**:
-  - Phase 1 Complete! Ready for Phase 2 (Dead wax matrix OCR, album cover match).
+- **Active Focus (Phase 3)**:
+  1. Feature 3.1: Discogs Market Value & Pricing Tracker (`/marketplace/price_suggestions/{release_id}`).
+  2. Feature 3.2: Two-Way Discogs Collection Sync & Backup/Export (CSV/JSON).
+  3. Feature 3.3: Collection Insights & Analytics Dashboard.
+  4. Feature 3.4: Shopping Mode (in-store acquisition & duplicate checker).
+- **Long-Term Backlog (Deprioritized - Preserved in ROADMAP.md)**:
+  - Dead wax / runout matrix etching OCR, Front cover visual match, Multi-disc / box sets.
 
 ---
 
